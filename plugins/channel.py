@@ -63,7 +63,7 @@ async def send_movie_update(bot, file_name, caption):
         caption_template = "<b>#ɴᴇᴡ_ᴍᴇᴅɪᴀ ✅\n\n🫥<code> {} </code>⿻\n\n📽 Fᴏʀᴍᴀᴛ: {}\n🔊 Aᴜᴅɪᴏ: {}</b>"
         full_caption = caption_template.format(file_name, quality, language)
         if kind:
-            full_caption += f"\n<b>#{kind}</b>"
+            full_caption += f"\n\n<b>#{kind}</b>"
         buttons = [[
             InlineKeyboardButton(f"❤️ {reaction_counts[unique_id]['❤️']}", callback_data=f"r_{unique_id}_{search_movie}_heart"),                
             InlineKeyboardButton(f"👍 {reaction_counts[unique_id]['👍']}", callback_data=f"r_{unique_id}_{search_movie}_like"),
