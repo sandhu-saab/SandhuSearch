@@ -60,7 +60,7 @@ async def send_movie_update(bot, file_name, caption):
         unique_id = generate_unique_id(search_movie)
         reaction_counts[unique_id] = {"❤️": 0, "👍": 0, "👎": 0, "🔥": 0}
         user_reactions[unique_id] = {}
-        caption_template = "<b>#ɴᴇᴡ_ᴍᴇᴅɪᴀ ✅\n\n🫥 {} ⿻\n\n📽 Fᴏʀᴍᴀᴛ: {}\n🔊 Aᴜᴅɪᴏ: {}</b>"
+        caption_template = "<b>#ɴᴇᴡ_ᴍᴇᴅɪᴀ ✅\n\n🫥<code> {} </code>⿻\n\n📽 Fᴏʀᴍᴀᴛ: {}\n🔊 Aᴜᴅɪᴏ: {}</b>"
         full_caption = caption_template.format(file_name, quality, language)
         if kind:
             full_caption += f"\n<b>#{kind}</b>"
@@ -109,7 +109,9 @@ async def reaction_handler(client, query):
             InlineKeyboardButton(f"👎 {reaction_counts[unique_id]['👎']}", callback_data=f"r_{unique_id}_{search_movie}_dislike"),
             InlineKeyboardButton(f"🔥 {reaction_counts[unique_id]['🔥']}", callback_data=f"r_{unique_id}_{search_movie}_fire")
         ],[
-            InlineKeyboardButton('Get File', url=f'https://telegram.me/{temp.U_NAME}?start=getfile-{search_movie}')
+            InlineKeyboardButton('📂 Gᴇᴛ Fɪʟᴇ 📂', url=f'https://telegram.me/{temp.U_NAME}?start=getfile-{search_movie}')
+        ],[
+            InlineKeyboardButton('♻️ Hᴏᴡ Tᴏ Dᴏᴡɴʟᴏᴀᴅ ♻️', url=f'https://t.me/+dVRLYHXJztJlMmY9')
         ]]
         await query.message.edit_reply_markup(reply_markup=InlineKeyboardMarkup(updated_buttons))
     except Exception as e:
