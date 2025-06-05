@@ -22,7 +22,7 @@ NEW_UPLOAD_CAPTION = """**𝖭𝖤𝖶 𝖥𝖨𝖫𝖤 𝖠𝖣𝖣𝖤𝖣 ✅
 
 🎬 Fɪʟᴇ Nᴀᴍᴇ: {NAME} #{KIND}
 📺 Fᴏʀᴍᴀᴛ: {QUALITY}
-🔰 Qᴜᴀʟɪᴛʏ: {PIXEL}
+🔰 Qᴜᴀʟɪᴛʏ: 720p, 1080p, etc.
 🔈 Aᴜᴅɪᴏ: {LANGUAGES}
 🎭 Gᴇɴʀᴇꜱ: {GENRE}
 ⭐️ IMDb: {RATING}★ | [𝖨𝖬𝖣𝖡 𝖨𝗇𝖿𝗈]({IMDB_LINK})**
