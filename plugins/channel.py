@@ -18,15 +18,15 @@ from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQ
 
 CAPTION_LANGUAGES = ["Bhojpuri", "Hindi", "Bengali", "Tamil", "English", "Bangla", "Telugu", "Malayalam", "Kannada", "Marathi", "Punjabi", "Bengoli", "Gujrati", "Korean", "Gujarati", "Spanish", "French", "German", "Chinese", "Arabic", "Portuguese", "Russian", "Japanese", "Odia", "Assamese", "Urdu"]
 
-NEW_UPLOAD_CAPTION = """**【{NAME}】🆕️
+NEW_UPLOAD_CAPTION = """<b>​​​【{NAME}】🆕️
 
 📺 Fᴏʀᴍᴀᴛ: {QUALITY}
 🔰 Qᴜᴀʟɪᴛʏ: 720p, 1080p, etc.
 🔈 Aᴜᴅɪᴏ: {LANGUAGES}
 🎭 Gᴇɴʀᴇꜱ: {GENRE}
-⭐️ IMDb: {RATING}★ 
+⭐️ IMDb: {RATING}★</b>
 
-👑 Pʀᴏᴠɪᴅᴇᴅ Bʏ : <a href='https://telegram.me/Baii_Ji'>Oᴛᴛ Sᴀɴᴅʜᴜ</a>**
+<blockquote>👑 Pʀᴏᴠɪᴅᴇᴅ Bʏ : <a href='https://telegram.me/Baii_Ji'>Oᴛᴛ Sᴀɴᴅʜᴜ</a></blockquote>
 """
 
 
