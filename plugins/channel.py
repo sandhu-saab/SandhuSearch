@@ -24,9 +24,9 @@ NEW_UPLOAD_CAPTION = """<b>​​​【{NAME}】🆕️
 🔰 Qᴜᴀʟɪᴛʏ: 720p, 1080p, etc.
 🔈 Aᴜᴅɪᴏ: {LANGUAGES}
 🎭 Gᴇɴʀᴇꜱ: {GENRE}
-⭐️ IMDb: {RATING}★</b>
+⭐️ IMDb: {RATING}★
 
-<blockquote>👑 Pʀᴏᴠɪᴅᴇᴅ Bʏ : <a href='https://telegram.me/Baii_Ji'>Oᴛᴛ Sᴀɴᴅʜᴜ</a></blockquote>
+<blockquote>👑 Pʀᴏᴠɪᴅᴇᴅ Bʏ : @Baii_Ji</blockquote></b>
 """
 
 
