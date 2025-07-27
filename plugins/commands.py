@@ -167,9 +167,10 @@ async def start(client, message):
         btn = []
         i = 1
         if AUTH_CHANNEL:
-            fsub_id_list = fsub_id_list + [AUTH_CHANNEL]
+            fsub_id_list += AUTH_CHANNEL
         if AUTH_REQ_CHANNEL:
-            fsub_id_list = fsub_id_list + [AUTH_REQ_CHANNEL]
+            fsub_id_list += AUTH_REQ_CHANNEL
+        fsub_id_list = list(set(fsub_id_list))  # remove duplicates if any
         
         if fsub_id_list:
             fsub_ids = [] # for check duplicate
