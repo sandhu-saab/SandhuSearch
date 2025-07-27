@@ -55,10 +55,13 @@ CHNL_LNK = environ.get('CHNL_LNK', 'https://t.me/OttSandhu')
 OWNER_LNK = environ.get('OWNER_LNK', 'https://t.me/Baii_Ji')
 UPDATE_CHANNEL_LNK = environ.get('UPDATE_CHANNEL_LNK', 'https://t.me/+nBnb3csEICIyNWM1')
 
-AUTH_CHANNEL = environ.get("AUTH_CHANNEL", "-1002429510787") # add multiple channels here, separated by single space
-AUTH_CHANNEL = [int(ch) for ch in AUTH_CHANNEL.strip().split()] if AUTH_CHANNEL else []
-AUTH_REQ_CHANNEL = environ.get('AUTH_REQ_CHANNEL', '-1002429510787 -1002116325676') # add multiple channels here, separated by single space
-AUTH_REQ_CHANNEL = [int(ch) for ch in AUTH_REQ_CHANNEL.strip().split()] if AUTH_REQ_CHANNEL else []
+# AUTH_CHANNEL (Single or Multiple Channels)
+AUTH_CHANNEL = environ.get("AUTH_CHANNEL", "-1002429510787").strip()  # Remove extra spaces
+AUTH_CHANNEL = [int(ch) for ch in AUTH_CHANNEL.split() if ch.lstrip('-').isdigit()] if AUTH_CHANNEL else []
+
+# AUTH_REQ_CHANNEL (Multiple Required Channels)
+AUTH_REQ_CHANNEL = environ.get('AUTH_REQ_CHANNEL', '-1002429510787 -1002116325676').strip()
+AUTH_REQ_CHANNEL = [int(ch) for ch in AUTH_REQ_CHANNEL.split() if ch.lstrip('-').isdigit()] if AUTH_REQ_CHANNEL else []
 
 IS_VERIFY = is_enabled('IS_VERIFY', True)
 LOG_VR_CHANNEL = int(environ.get('LOG_VR_CHANNEL', '-1002122152204'))
