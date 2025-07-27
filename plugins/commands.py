@@ -167,83 +167,62 @@ async def start(client, message):
         btn = []
         i = 1
 
-        # Safely add channels to the list (handles both single IDs and lists)
-        def safe_add_channels(source, target_list):
-            if isinstance(source, (list, tuple)):
-                target_list.extend(source)
-            elif source:  # Handles single integer/Int64
-                target_list.append(int(source))  # Convert to regular int
-    
-        # Add auth channels
-        safe_add_channels(AUTH_CHANNEL, fsub_id_list)
-        safe_add_channels(AUTH_REQ_CHANNEL, fsub_id_list)
+        # चैनल्स को सुरक्षित तरीके से जोड़ने का फंक्शन
+        def add_channels(source):
+            if source:  # अगर सोर्स खाली नहीं है
+                if isinstance(source, (list, tuple)):  # लिस्ट/टपल चेक
+                    fsub_id_list.extend([int(x) for x in source])
+                else:  # सिंगल वैल्यू के लिए
+                    fsub_id_list.append(int(source))
+
+        # चैनल्स जोड़ें
+        add_channels(AUTH_CHANNEL)
+        add_channels(AUTH_REQ_CHANNEL)
 
         if fsub_id_list:
-            fsub_ids = []  # for checking duplicates
+            fsub_ids = []
             for chnl in fsub_id_list:
-                # Ensure channel ID is integer (handles Int64/numpy.int64 etc)
-                chnl = int(chnl)
-            
+                chnl = int(chnl)  # पक्का करें कि चैनल ID इंटीजर है
                 if chnl not in fsub_ids:
                     fsub_ids.append(chnl)
-                else:
-                    continue
-            
-                # Check if channel requires join request
-                is_req_channel = AUTH_REQ_CHANNEL and chnl in [int(x) for x in AUTH_REQ_CHANNEL]
-            
-                if is_req_channel and not await is_req_subscribed(client, message, chnl):
-                    try:
-                        invite_link = await client.create_chat_invite_link(
-                            chnl, 
-                            creates_join_request=True
-                        )
-                        btn.append([
-                            InlineKeyboardButton(
-                                f"⛔️ ᴊᴏɪɴ ɴᴏᴡ channel {i} (Approval Needed) ⛔️", 
-                                url=invite_link.invite_link
-                            )
-                        ])
-                    except ChatAdminRequired:
-                        print(f"Bot needs admin in channel {chnl} to create join links")
-                        continue
-                    
-                elif not is_req_channel and not await is_subscribed(client, message.from_user.id, chnl):
-                    try:
-                        invite_link = await client.create_chat_invite_link(chnl)
-                        btn.append([
-                            InlineKeyboardButton(
-                                f"⛔️ ᴊᴏɪɴ ɴᴏᴡ channel {i} ⛔️", 
-                                url=invite_link.invite_link
-                            )
-                        ])
-                    except ChatAdminRequired:
-                        print(f"Bot needs admin in channel {chnl} to create invite links")
-                        continue
-                    
-                i += 1
+                
+                    # AUTH_REQ_CHANNEL को लिस्ट में बदलें
+                    req_channels = [int(x) for x in AUTH_REQ_CHANNEL] if AUTH_REQ_CHANNEL else []
+                
+                    if req_channels and chnl in req_channels and not await is_req_subscribed(client, message, chnl):
+                        try:
+                            invite_link = await client.create_chat_invite_link(chnl, creates_join_request=True)
+                            btn.append([InlineKeyboardButton(f"⛔️ Join Channel {i} (Approval Needed) ⛔️", url=invite_link.invite_link)])
+                        except Exception as e:
+                            print(f"Failed to create join link for {chnl}: {e}")
+                            continue
+                        
+                    elif chnl not in req_channels and not await is_subscribed(client, message.from_user.id, chnl):
+                        try:
+                            invite_link = await client.create_chat_invite_link(chnl)
+                            btn.append([InlineKeyboardButton(f"⛔️ Join Channel {i} ⛔️", url=invite_link.invite_link)])
+                        except Exception as e:
+                            print(f"Failed to create invite link for {chnl}: {e}")
+                            continue
+                
+                    i += 1
 
             if btn:
                 if message.command[1] != "subscribe":
-                    btn.append([
-                        InlineKeyboardButton(
-                            "♻️ ᴛʀʏ ᴀɢᴀɪɴ ♻️", 
-                            url=f"https://t.me/{temp.U_NAME}?start={message.command[1]}"
-                        )
-                    ])
+                    btn.append([InlineKeyboardButton("♻️ Try Again ♻️", url=f"https://t.me/{temp.U_NAME}?start={message.command[1]}")])
             
                 await client.send_photo(
                     chat_id=message.from_user.id,
                     photo=random.choice(FSUB_IMG),
                     caption=script.FORCESUB_TEXT,
                     reply_markup=InlineKeyboardMarkup(btn),
-                    parse_mode=enums.ParseMode.HTML,
+                    parse_mode=enums.ParseMode.HTML
                 )
                 return
-            
+
     except Exception as e:
-        await log_error(client, f"Force Subscription Error: {type(e)} - {e}")
-        print(f"Force Sub Error: {e}")
+        await log_error(client, f"Force Subscribe Error: {type(e).__name__} - {str(e)}")
+        print(f"Force Subscribe Error: {e}")
         
     user_id = m.from_user.id
     if not await db.has_premium_access(user_id):
