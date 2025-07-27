@@ -166,48 +166,72 @@ async def start(client, message):
         fsub_id_list = settings.get('fsub_id', [])
         btn = []
         i = 1
+
+        # Safely add channels to the list (handles both single IDs and lists)
+        def safe_add_channels(source, target_list):
+            if isinstance(source, (list, tuple)):
+                target_list.extend(source)
+            elif source:  # Handles single integer/Int64
+                target_list.append(int(source))  # Convert to regular int
     
-        # Correct way to add channels to the list
-        if AUTH_CHANNEL:
-            fsub_id_list.extend(AUTH_CHANNEL)  # Use extend() instead of +
-        if AUTH_REQ_CHANNEL:
-            fsub_id_list.extend(AUTH_REQ_CHANNEL)  # Use extend() instead of +
+        # Add auth channels
+        safe_add_channels(AUTH_CHANNEL, fsub_id_list)
+        safe_add_channels(AUTH_REQ_CHANNEL, fsub_id_list)
 
         if fsub_id_list:
             fsub_ids = []  # for checking duplicates
             for chnl in fsub_id_list:
+                # Ensure channel ID is integer (handles Int64/numpy.int64 etc)
+                chnl = int(chnl)
+            
                 if chnl not in fsub_ids:
                     fsub_ids.append(chnl)
                 else:
                     continue
-                
-                if AUTH_REQ_CHANNEL and chnl in AUTH_REQ_CHANNEL and not await is_req_subscribed(client, message, chnl):
-                    # Your subscription check logic here
-                    pass
-                
-            # Rest of your code...
+            
+                # Check if channel requires join request
+                is_req_channel = AUTH_REQ_CHANNEL and chnl in [int(x) for x in AUTH_REQ_CHANNEL]
+            
+                if is_req_channel and not await is_req_subscribed(client, message, chnl):
                     try:
-                        invite_link = await client.create_chat_invite_link(chnl, creates_join_request=True)
+                        invite_link = await client.create_chat_invite_link(
+                            chnl, 
+                            creates_join_request=True
+                        )
+                        btn.append([
+                            InlineKeyboardButton(
+                                f"⛔️ ᴊᴏɪɴ ɴᴏᴡ channel {i} (Approval Needed) ⛔️", 
+                                url=invite_link.invite_link
+                            )
+                        ])
                     except ChatAdminRequired:
-                        print("Bot Ko AUTH_CHANNEL Per Admin Bana Bhai Pahile 🤧")
-                        return
-                    btn.append([
-                        InlineKeyboardButton(f"⛔️ ᴊᴏɪɴ ɴᴏᴡ channel {i}⛔️", url=invite_link.invite_link)
-                    ])
-                elif chnl not in AUTH_REQ_CHANNEL and not await is_subscribed(client, message.from_user.id, chnl):
+                        print(f"Bot needs admin in channel {chnl} to create join links")
+                        continue
+                    
+                elif not is_req_channel and not await is_subscribed(client, message.from_user.id, chnl):
                     try:
                         invite_link = await client.create_chat_invite_link(chnl)
+                        btn.append([
+                            InlineKeyboardButton(
+                                f"⛔️ ᴊᴏɪɴ ɴᴏᴡ channel {i} ⛔️", 
+                                url=invite_link.invite_link
+                            )
+                        ])
                     except ChatAdminRequired:
-                        print("Bot Ko AUTH_CHANNEL Per Admin Bana Bhai Pahile 🤧")
-                        return
-                    btn.append([
-                        InlineKeyboardButton(f"⛔️ ᴊᴏɪɴ ɴᴏᴡ channel {i}⛔️", url=invite_link.invite_link)
-                    ])
+                        print(f"Bot needs admin in channel {chnl} to create invite links")
+                        continue
+                    
                 i += 1
 
             if btn:
                 if message.command[1] != "subscribe":
-                    btn.append([InlineKeyboardButton("♻️ ᴛʀʏ ᴀɢᴀɪɴ ♻️", url=f"https://t.me/{temp.U_NAME}?start={message.command[1]}")])
+                    btn.append([
+                        InlineKeyboardButton(
+                            "♻️ ᴛʀʏ ᴀɢᴀɪɴ ♻️", 
+                            url=f"https://t.me/{temp.U_NAME}?start={message.command[1]}"
+                        )
+                    ])
+            
                 await client.send_photo(
                     chat_id=message.from_user.id,
                     photo=random.choice(FSUB_IMG),
@@ -216,9 +240,10 @@ async def start(client, message):
                     parse_mode=enums.ParseMode.HTML,
                 )
                 return
+            
     except Exception as e:
-        await log_error(client, f"Got Error In Force Subscription Function.\n\n Error - {e}")
-        print(f"Error In Fsub :- {e}")
+        await log_error(client, f"Force Subscription Error: {type(e)} - {e}")
+        print(f"Force Sub Error: {e}")
         
     user_id = m.from_user.id
     if not await db.has_premium_access(user_id):
