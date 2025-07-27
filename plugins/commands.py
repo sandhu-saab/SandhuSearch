@@ -168,20 +168,29 @@ async def start(client, message):
         i = 1
 
         def add_channels(source, target_list):
-            if not source:
+        try:
+            # पहले source को list में बदलें (अगर पहले से list नहीं है)
+            if source is None:
                 return
-        
-            if not isinstance(source, (list, tuple)):
+            
+            if not hasattr(source, '__iter__') or isinstance(source, str):
                 source = [source]
         
-            try:
-                target_list.extend(int(item) for item in source)
-            except (ValueError, TypeError) as e:
-                print(f"Channel ID conversion error: {e}")
+           # सभी items को int में convert करें
+            converted_ids = []
+            for item in source:
+                try:
+                    converted_ids.append(int(item))
+                except (ValueError, TypeError):
+                    continue
+                
+            target_list.extend(converted_ids)
+        except Exception as e:
+            print(f"Error in add_channels: {e}")
 
-        # चैनल्स जोड़ें
-        add_channels(AUTH_CHANNEL, fsub_id_list)
-        add_channels(AUTH_REQ_CHANNEL, fsub_id_list)
+    # उपयोग:
+    add_channels(AUTH_CHANNEL, fsub_id_list)
+    add_channels(AUTH_REQ_CHANNEL, fsub_id_list)
 
         if fsub_id_list:
             fsub_ids = []
