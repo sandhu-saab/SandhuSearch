@@ -166,20 +166,26 @@ async def start(client, message):
         fsub_id_list = settings.get('fsub_id', [])
         btn = []
         i = 1
+    
+        # Correct way to add channels to the list
         if AUTH_CHANNEL:
-            fsub_id_list += AUTH_CHANNEL
+            fsub_id_list.extend(AUTH_CHANNEL)  # Use extend() instead of +
         if AUTH_REQ_CHANNEL:
-            fsub_id_list += AUTH_REQ_CHANNEL
-        fsub_id_list = list(set(fsub_id_list))  # remove duplicates if any
-        
+            fsub_id_list.extend(AUTH_REQ_CHANNEL)  # Use extend() instead of +
+
         if fsub_id_list:
-            fsub_ids = [] # for check duplicate
+            fsub_ids = []  # for checking duplicates
             for chnl in fsub_id_list:
                 if chnl not in fsub_ids:
                     fsub_ids.append(chnl)
                 else:
                     continue
+                
                 if AUTH_REQ_CHANNEL and chnl in AUTH_REQ_CHANNEL and not await is_req_subscribed(client, message, chnl):
+                    # Your subscription check logic here
+                    pass
+                
+            # Rest of your code...
                     try:
                         invite_link = await client.create_chat_invite_link(chnl, creates_join_request=True)
                     except ChatAdminRequired:
