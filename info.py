@@ -66,9 +66,9 @@ LOG_VR_CHANNEL = int(environ.get('LOG_VR_CHANNEL', '-1002122152204'))
 LOG_API_CHANNEL = int(environ.get('LOG_API_CHANNEL', '-1002122152204'))
 VERIFY_IMG = environ.get("VERIFY_IMG", "https://telegra.ph/file/9ecc5d6e4df5b83424896.jpg")
 
-TUTORIAL = environ.get("TUTORIAL", "https://t.me/c/2368551947/10")
-TUTORIAL_2 = environ.get("TUTORIAL_2", "https://t.me/c/2368551947/11")
-TUTORIAL_3 = environ.get("TUTORIAL_3", "https://t.me/c/2368551947/12")
+TUTORIAL = environ.get("TUTORIAL", "https://t.me/+dVRLYHXJztJlMmY9")
+TUTORIAL_2 = environ.get("TUTORIAL_2", "https://t.me/+dVRLYHXJztJlMmY9")
+TUTORIAL_3 = environ.get("TUTORIAL_3", "https://t.me/+dVRLYHXJztJlMmY9")
 
 SHORTENER_API = environ.get("SHORTENER_API", "d69bdc9eeef4d1cb0d2bb9733099a0282bdc64ac")
 SHORTENER_WEBSITE = environ.get("SHORTENER_WEBSITE", "linkshortify.com")
