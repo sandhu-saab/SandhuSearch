@@ -65,10 +65,19 @@
     <script src="https://developer-six-dusky.vercel.app/548/551/SilentXBotz.js"></script>
 
     <script>
-    // Replace all "SilentXBotz" text dynamically with "Ott Sandhu"
-    document.addEventListener("DOMContentLoaded", function() {
-        document.body.innerHTML = document.body.innerHTML.replace(/SilentXBotz/g, 'Ott Sandhu');
+// Footer me "SilentXBotz" ko "Ott Sandhu" me replace karega jab wo load hoga
+const observer = new MutationObserver(function(mutations_list) {
+    mutations_list.forEach(function(mutation) {
+        mutation.addedNodes.forEach(function(added_node) {
+            if(added_node.nodeType === 1) {
+                if (added_node.textContent.includes("SilentXBotz")) {
+                    added_node.innerHTML = added_node.innerHTML.replace(/SilentXBotz/g, 'Ott Sandhu');
+                }
+            }
+        });
     });
+});
+observer.observe(document.body, { childList: true, subtree: true });
     </script>
 
 </body></html>
