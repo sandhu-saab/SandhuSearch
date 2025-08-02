@@ -18,7 +18,6 @@ SESSION = environ.get('SESSION', 'media_search')
 API_ID = int(environ.get('API_ID', '29882686'))
 API_HASH = environ.get('API_HASH', 'b642a25aee67b2aed02116df4a916bca')
 BOT_TOKEN = environ.get('BOT_TOKEN', "")
-U_NAME = "SearchMovie04Bot"
 
 CACHE_TIME = int(environ.get('CACHE_TIME', 300))
 USE_CAPTION_FILTER = bool(environ.get('USE_CAPTION_FILTER', True))
@@ -52,7 +51,6 @@ MULTIPLE_DB = is_enabled(os.environ.get('MULTIPLE_DB', "False"), False) # Type T
 DATABASE_URI2 = environ.get('DATABASE_URI2', "")
 DB_CHANGE_LIMIT = int(environ.get('DB_CHANGE_LIMIT', "432")) 
 
-PROVIDER_NAME = "@OttSandhu"
 GRP_LNK = environ.get('GRP_LNK', 'https://t.me/+xid7xzHRfucyMjc1')
 CHNL_LNK = environ.get('CHNL_LNK', 'https://t.me/OttSandhu')
 OWNER_LNK = environ.get('OWNER_LNK', 'https://t.me/Baii_Ji')
