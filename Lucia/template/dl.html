@@ -30,50 +30,45 @@
             </div>
             <p><strong>Name:</strong> {{file_name}}</p>
             <p><strong>Size:</strong> {{file_size}}</p>
-        </div><div class="action-buttons">
-        <div class="button-row">
-            <button class="vlc" onclick="vlc_player()"><img src="https://i.postimg.cc/15TQ4y7B/vlc.png" alt="VLC">Watch in VLC</button>
-            <button class="mx" onclick="mx_player()"><img src="https://i.postimg.cc/sx4Msv4T/mx.png" alt="MX">Watch in MX Player</button>
         </div>
-        <div class="button-row">
-            <button class="playit" onclick="playit_player()"><img src="https://i.postimg.cc/RVGWYJFF/playit.png" alt="PlayIt">Watch in PlayIt</button>
+        <div class="action-buttons">
+            <div class="button-row">
+                <button class="vlc" onclick="vlc_player()"><img src="https://i.postimg.cc/15TQ4y7B/vlc.png" alt="VLC">Watch in VLC</button>
+                <button class="mx" onclick="mx_player()"><img src="https://i.postimg.cc/sx4Msv4T/mx.png" alt="MX">Watch in MX Player</button>
+            </div>
+            <div class="button-row">
+                <button class="playit" onclick="playit_player()"><img src="https://i.postimg.cc/RVGWYJFF/playit.png" alt="PlayIt">Watch in PlayIt</button>
+            </div>
+            <div class="button-row download-row">
+                <button class="download" onclick="Download()">
+                    <i class="fas fa-download" style="margin-right: 0.5rem;"></i>Download
+                </button>
+            </div>
+            <div class="button-row copy-share">
+                <button class="copy" onclick="copy_url()"><i class="fas fa-copy"></i>Copy URL</button>
+                <button class="share" onclick="shareButton()"><i class="fas fa-share-alt"></i>Share URL</button>
+            </div>
         </div>
-        <div class="button-row download-row">
-            <button class="download" onclick="Download()">
-                <i class="fas fa-download" style="margin-right: 0.5rem;"></i>Download
-            </button>
-        </div>
-        <div class="button-row copy-share">
-            <button class="copy" onclick="copy_url()"><i class="fas fa-copy"></i>Copy URL</button>
-            <button class="share" onclick="shareButton()"><i class="fas fa-share-alt"></i>Share URL</button>
+        <div id="messagePopup" class="message-popup"></div>
+        <div class="disclaimer">
+            <div class="title">
+                <img src="https://i.postimg.cc/zXs0sH6x/info-button.png" alt="Warning">
+                <h3>Disclaimer</h3>
+            </div>
+            <p>Ott Sandhu Does Not Host Or Own The Streamed Content. Users Are Responsible For Complying With Copyright Laws.</p>
+            <p>All Media Is Sourced From Third-Party Services, And Ott Sandhu Is Not Liable For Misuse Or Legal Violations.</p>
         </div>
     </div>
-    <div id="messagePopup" class="message-popup"></div>
-    <div class="disclaimer">
-        <div class="title">
-            <img src="https://i.postimg.cc/zXs0sH6x/info-button.png" alt="Warning">
-            <h3>Disclaimer</h3>
-        </div>
-        <p>Ott Sandhu Does Not Host Or Own The Streamed Content. Users Are Responsible For Complying With Copyright Laws.</p>
-        <p>All Media Is Sourced From Third-Party Services, And Ott Sandhu Is Not Liable For Misuse Or Legal Violations.</p>
-    </div>
-</div>
 
-<!-- Custom Footer Start -->
-<div style="text-align: center; color: white; padding: 10px; font-family: 'Lato', sans-serif;">
-    Copyright © 2025 Ott Sandhu. All Rights Reserved.
-</div>
-<!-- Custom Footer End -->
+    <script src="https://cdn.plyr.io/3.6.12/plyr.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script src="https://developer-six-dusky.vercel.app/548/551/SilentXBotz.js"></script>
 
-<script src="https://cdn.plyr.io/3.6.12/plyr.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
-<script src="https://developer-six-dusky.vercel.app/548/551/SilentXBotz.js"></script>
-
-<script>
-// Replace any remaining "SilentXBotz" text dynamically
-document.addEventListener("DOMContentLoaded", function() {
-    document.body.innerHTML = document.body.innerHTML.replace(/SilentXBotz/g, 'Ott Sandhu');
-});
-</script>
+    <script>
+    // Replace all "SilentXBotz" text dynamically with "Ott Sandhu"
+    document.addEventListener("DOMContentLoaded", function() {
+        document.body.innerHTML = document.body.innerHTML.replace(/SilentXBotz/g, 'Ott Sandhu');
+    });
+    </script>
 
 </body></html>
