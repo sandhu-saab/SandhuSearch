@@ -18,6 +18,7 @@ SESSION = environ.get('SESSION', 'media_search')
 API_ID = int(environ.get('API_ID', '29882686'))
 API_HASH = environ.get('API_HASH', 'b642a25aee67b2aed02116df4a916bca')
 BOT_TOKEN = environ.get('BOT_TOKEN', "")
+U_NAME = "SearchMovie04Bot"
 
 CACHE_TIME = int(environ.get('CACHE_TIME', 300))
 USE_CAPTION_FILTER = bool(environ.get('USE_CAPTION_FILTER', True))
