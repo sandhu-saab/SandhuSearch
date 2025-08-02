@@ -11,15 +11,13 @@ from database.ia_filterdb import save_file
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from pyrogram.errors import MessageNotModified
 
-# ========== SETTINGS ==========
+# ========== SETTINGS ========== #
 MAX_CALLBACK_SIZE = 64
-CAPTION_LANGUAGES = [
-    "Bhojpuri", "Hindi", "Bengali", "Tamil", "English",
-    "Bangla", "Telugu", "Malayalam", "Kannada", "Marathi",
-    "Punjabi", "Bengoli", "Gujrati", "Korean", "Gujarati",
-    "Spanish", "French", "German", "Chinese", "Arabic",
-    "Portuguese", "Russian", "Japanese", "Odia", "Assamese", "Urdu"
-]
+CAPTION_LANGUAGES = ["Bhojpuri", "Hindi", "Bengali", "Tamil", "English",
+                     "Bangla", "Telugu", "Malayalam", "Kannada", "Marathi",
+                     "Punjabi", "Bengoli", "Gujrati", "Korean", "Gujarati",
+                     "Spanish", "French", "German", "Chinese", "Arabic",
+                     "Portuguese", "Russian", "Japanese", "Odia", "Assamese", "Urdu"]
 POSTER_API_URL = "https://image.silentxbotz.tech/api/v1/poster"
 HOW_TO_DOWNLOAD_URL = "https://t.me/+dVRLYHXJztJlMmY9"
 DEFAULT_POSTER_URL = "https://te.legra.ph/file/88d845b4f8a024a71465d.jpg"
@@ -33,7 +31,8 @@ TITLE_CLEAN_PATTERNS = [
     r'\bS\d{1,2}\b', r'\bSeason\s?\d{1,2}\b',
     r'\b\d{4}\b', r'\.mkv$', r'\.mp4$', r'\.avi$',
     r'[-_]\s*x264\b', r'[-_]\s*(Tam|Tel|Hin|Eng)\b',
-    r'[-_]\s*[A-Za-z]\s*$', r'^\W+|\W+$', r'\s*[-_]\s*[-_]\s*'
+    r'[-_]\s*[A-Za-z]\s*$', r'^\W+|\W+$',
+    r'\s*[-_]\s*[-_]\s*',
 ]
 
 IGNORE_WORDS = {
@@ -53,12 +52,12 @@ IGNORE_WORDS = {
     "apple", "hoichoi", "sunnxt", "viki"
 }
 
-# ========== GLOBAL DATA ==========
+# ========== GLOBAL DATA ========== #
 movie_data: Dict[str, dict] = {}
 reaction_counts: Dict[str, dict] = {}
 user_reactions: Dict[str, dict] = {}
 
-# ========== HELPER FUNCTIONS ==========
+# ========== HELPER FUNCTIONS ========== #
 def generate_movie_id(movie_name: str) -> str:
     return hashlib.sha256(movie_name.encode()).hexdigest()[:8]
 
@@ -96,42 +95,53 @@ def build_reaction_buttons(movie_id: str, search_query: str) -> InlineKeyboardMa
     ]
     return InlineKeyboardMarkup(buttons)
 
+# ========== DATA EXTRACTION FUNCTIONS ========== #
 async def extract_metadata(text: str) -> Tuple[Set[str], Set[str], Set[str], Set[str]]:
     text_lower = text.lower()
     formats, qualities, languages, ott = set(), set(), set(), set()
-    format_keywords = {"ORG", "HDRip", "WEB-DL", "WEBRip", "HDCAM", "HQ", "CAMRip", "HDTC", "DVDscr", "dvdrip"}
+
+    format_keywords = {"ORG", "HDRip", "WEB-DL", "WEBRip", "HDCAM", "HQ", "CAMRip", "HDTC", "DVDscr", "dvdrip", "dvdscreen", "HDTS"}
     for fmt in format_keywords:
         if re.search(rf"\b{re.escape(fmt.lower())}\b", text_lower):
             formats.add(fmt)
-    quality_keywords = {"480p", "720p", "1080p", "2160p", "4k", "2k"}
-    for qual in quality_keywords:
+
+    for qual in {"480p", "720p", "1080p", "2160p", "4k", "2k"}:
         if re.search(rf"\b{re.escape(qual)}\b", text_lower):
             qualities.add(qual)
+
     for lang in CAPTION_LANGUAGES:
         if re.search(rf"\b{re.escape(lang.lower())}\b", text_lower):
             languages.add(lang)
+
     ott_keywords = {
         "Netflix": ["nf", "netflix"], "SonyLiv": ["sonyliv", "sony", "sliv"],
-        "Amazon Prime Video": ["amzn", "prime", "primevideo"], "Disney+ Hotstar": ["hotstar"]
+        "Amazon Prime Video": ["amzn", "prime", "primevideo"], "Disney+ Hotstar": ["hotstar"],
+        "Zee5": ["zee5"], "JioHotstar": ["jio", "jhs"], "Aha": ["aha"], "HBO Max": ["hbo"],
+        "Paramount+": ["paramount"], "Apple TV+": ["apple"], "Hoichoi": ["hoichoi"], "Sun NXT": ["sunnxt"],
+        "Viki": ["viki"], "ChaupalTV": ["chtv", "chpl", "chaupal"], "KABLEONE": ["kableone"]
     }
     for platform, keys in ott_keywords.items():
         if any(re.search(rf"\b{re.escape(k)}\b", text_lower) for k in keys):
             ott.add(platform)
+
     return formats, qualities, languages, ott
 
-# ========== MOVIE UPDATE HANDLER ==========
+# ========== MOVIE UPDATE HANDLER ========== #
 @Client.on_message(filters.chat(CHANNELS) & (filters.document | filters.video | filters.audio))
 async def media_handler(bot: Client, message):
     try:
         media = message.document or message.video or message.audio
         if not media:
             return
+
         media.file_type = "document" if message.document else "video" if message.video else "audio"
         media.caption = message.caption or ""
         media.file_name = getattr(media, "file_name", "") or ""
+
         success, _ = await save_file(media)
         if not success or not await get_status(bot.me.id):
             return
+
         await process_movie_update(bot, media.file_name, media.caption)
     except Exception as e:
         print(f"❌ Media handler error: {e}")
@@ -140,43 +150,46 @@ async def process_movie_update(bot: Client, file_name: str, caption: str):
     try:
         clean_name = clean_movie_title(file_name)
         clean_name, year = extract_year(clean_name)
+
         if not clean_name or len(clean_name) < 3:
             clean_name = clean_movie_title(caption)
             clean_name, year = extract_year(clean_name)
+
         if not clean_name or len(clean_name) < 3:
             print(f"⚠️ Invalid title: {file_name}")
             return
+
         movie_id = generate_movie_id(clean_name)
         search_query = hashlib.md5(clean_name.encode()).hexdigest()[:12]
+
         formats, qualities, languages, ott = await extract_metadata(f"{clean_name} {caption}")
+
         if movie_id not in movie_data:
             movie_data[movie_id] = {
-                'title': clean_name, 'year': year,
-                'formats': set(), 'qualities': set(),
-                'languages': set(), 'ott': set(),
-                'message_id': None, 'search_query': search_query
+                'title': clean_name, 'year': year, 'formats': set(), 'qualities': set(),
+                'languages': set(), 'ott': set(), 'message_id': None, 'search_query': search_query
             }
             reaction_counts[movie_id] = {"❤️": 0, "👍": 0, "👎": 0, "🔥": 0}
             user_reactions[movie_id] = {}
+
         movie_data[movie_id]['formats'].update(formats)
         movie_data[movie_id]['qualities'].update(qualities)
         movie_data[movie_id]['languages'].update(languages)
         movie_data[movie_id]['ott'].update(ott)
+
         imdb_data = {}
         try:
             imdb_data = await get_poster(clean_name) or {}
         except Exception as e:
             print(f"❌ IMDb fetch error: {e}")
-        display_title = clean_name
-        if year:
-            display_title = f"{clean_name} ({year})"
-        elif imdb_data.get("year"):
-            display_title = f"{clean_name} ({imdb_data['year']})"
+
+        display_title = f"{clean_name} ({year or imdb_data.get('year', '')})".strip()
+
         caption_lines = [f"<b>【{display_title}】🆕️</b>"]
         if movie_data[movie_id]['ott']:
             caption_lines.append(f"<b>📀 OTT - {', '.join(sorted(movie_data[movie_id]['ott']))}</b>")
         if imdb_data.get("rating"):
-            rating = imdb_data['rating'] if '★' in imdb_data['rating'] else f"{imdb_data['rating']}★"
+            rating = imdb_data["rating"] if '★' in imdb_data["rating"] else f"{imdb_data['rating']}★"
             caption_lines.append(f"<b>⭐️ Rating - {rating}</b>")
         if movie_data[movie_id]['formats']:
             caption_lines.append(f"<b>📺 Format - {', '.join(sorted(movie_data[movie_id]['formats']))}</b>")
@@ -189,9 +202,15 @@ async def process_movie_update(bot: Client, file_name: str, caption: str):
         caption_lines.append("")
         caption_lines.append(f"<blockquote>👑 Provided By : {PROVIDER_NAME}</blockquote>")
         full_caption = "\n".join(caption_lines)
+
         buttons = build_reaction_buttons(movie_id, search_query)
-        poster = await fetch_movie_poster(imdb_data.get("title", clean_name), imdb_data.get("year", year))
-        
+
+        poster = await fetch_movie_poster(clean_name, year)
+        photo_data = None
+        if poster:
+            photo_data = io.BytesIO(poster)
+            photo_data.name = "poster.jpg"
+
         if movie_data[movie_id]['message_id']:
             try:
                 await bot.edit_message_caption(
@@ -207,15 +226,16 @@ async def process_movie_update(bot: Client, file_name: str, caption: str):
             except Exception as e:
                 print(f"⚠️ Edit failed: {e}")
                 movie_data[movie_id]['message_id'] = None
-        
+
         sent = await bot.send_photo(
             chat_id=MOVIE_UPDATE_CHANNEL,
-            photo=poster or DEFAULT_POSTER_URL,
+            photo=photo_data if photo_data else DEFAULT_POSTER_URL,
             caption=full_caption,
             reply_markup=buttons
         )
         movie_data[movie_id]['message_id'] = sent.message_id
         print(f"📤 New movie: {display_title}")
+
     except Exception as e:
         print(f"❌ Process error: {e}")
 
