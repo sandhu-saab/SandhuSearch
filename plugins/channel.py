@@ -4,7 +4,7 @@ import aiohttp
 import asyncio
 import hashlib
 from info import *
-from utils import *  # Make sure get_poster is imported from utils
+from utils import *
 from typing import Optional, Dict, Set, Tuple, Any
 from pyrogram import Client, filters
 from database.ia_filterdb import save_file
@@ -22,23 +22,23 @@ POSTER_API_URL = "https://image.silentxbotz.tech/api/v1/poster"
 HOW_TO_DOWNLOAD_URL = "https://t.me/+dVRLYHXJztJlMmY9"
 DEFAULT_POSTER_URL = "https://te.legra.ph/file/88d845b4f8a024a71465d.jpg"
 
-# Enhanced patterns to remove season indicators and other unwanted text
+# Enhanced patterns to remove all unwanted text
 TITLE_CLEAN_PATTERNS = [
-    r'\d{3,4}p',                   # Resolutions like 1080p, 720p
-    r'\bH?\.?264\b',                # Codecs
-    r'\bHEVC\b', r'\bx265\b',       # Codecs
-    r'\bWEB[- ]?DL\b',              # Formats
-    r'\bHDRip\b', r'\bBluRay\b',    # Formats
-    r'\bDDP?\d\.\d\b',              # Audio formats
-    r'\bAAC\b', r'\bAC3\b',         # Audio formats
-    r'\bNF\b', r'\bAMZN\b',         # OTT platforms
-    r'\bHotstar\b',                 # OTT platforms
-    r'\bESub\b', r'\bHQ\b',         # Miscellaneous
-    r'\bORG\b',                     # Miscellaneous
-    r'\bS\d{1,2}\b',                # Season indicators (S01, S02, etc.)
+    r'\d{3,4}p',                   # Resolutions
+    r'\bH?\.?264\b', r'\bHEVC\b', r'\bx265\b',  # Codecs
+    r'\bWEB[- ]?DL\b', r'\bHDRip\b', r'\bBluRay\b',  # Formats
+    r'\bDDP?\d\.\d\b', r'\bAAC\b', r'\bAC3\b',  # Audio formats
+    r'\bNF\b', r'\bAMZN\b', r'\bHotstar\b',  # OTT platforms
+    r'\bESub\b', r'\bHQ\b', r'\bORG\b',  # Miscellaneous
+    r'\bS\d{1,2}\b',                # Season indicators
     r'\bSeason\s?\d{1,2}\b',        # Season indicators
     r'\b\d{4}\b',                   # Years
-    r'\.mkv$', r'\.mp4$', r'\.avi$' # File extensions
+    r'\.mkv$', r'\.mp4$', r'\.avi$', # File extensions
+    r'[-_]\s*x264\b',               # Specific codec pattern
+    r'[-_]\s*(Tam|Tel|Hin|Eng)\b',  # Language abbreviations
+    r'[-_]\s*[A-Za-z]\s*$',         # Trailing single letters
+    r'^\W+|\W+$',                   # Leading/trailing non-word chars
+    r'\s*[-_]\s*[-_]\s*',           # Multiple dashes/underscores
 ]
 
 # ========== GLOBAL DATA ========== #
@@ -53,18 +53,11 @@ def generate_movie_id(movie_name: str) -> str:
 
 def clean_movie_title(title: str) -> str:
     """
-    Clean and normalize movie title by removing unwanted patterns
-    and preserving the core title only
+    Clean and normalize movie title by removing all unwanted patterns
     """
-    # First remove year if present at the end
-    title = re.sub(r'\s*\(\d{4}\)\s*$', '', title)
-    
-    # Remove common patterns and keywords
+    # Remove all unwanted patterns
     for pattern in TITLE_CLEAN_PATTERNS:
         title = re.sub(pattern, '', title, flags=re.IGNORECASE)
-    
-    # Remove season indicators in parentheses
-    title = re.sub(r'\s*\(?S\d{1,2}\)?\s*', '', title, flags=re.IGNORECASE)
     
     # Remove special characters except spaces and hyphens
     title = re.sub(r'[^\w\s-]', '', title)
@@ -72,8 +65,11 @@ def clean_movie_title(title: str) -> str:
     # Remove extra spaces and trim
     title = re.sub(r'\s+', ' ', title).strip()
     
-    # Remove trailing hyphens and numbers
-    title = re.sub(r'[-_\d\s]+$', '', title).strip()
+    # Remove leading/trailing dashes and underscores
+    title = re.sub(r'^[-_\s]+|[-_\s]+$', '', title)
+    
+    # Capitalize first letter of each word
+    title = title.title()
     
     return title
 
@@ -191,8 +187,13 @@ async def process_movie_update(bot: Client, file_name: str, caption: str):
         clean_name = clean_movie_title(file_name)
         clean_name, year = extract_year(clean_name)
         
-        if not clean_name:
-            print("⚠️ Invalid file name")
+        # If we have a messy title, try cleaning again with caption
+        if not clean_name or len(clean_name) < 3:
+            clean_name = clean_movie_title(caption)
+            clean_name, year = extract_year(clean_name)
+            
+        if not clean_name or len(clean_name) < 3:
+            print(f"⚠️ Invalid title: {file_name}")
             return
 
         # Generate unique movie ID
