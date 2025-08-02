@@ -1,20 +1,18 @@
 import re
 import io
-import random
-import string
 import aiohttp
 import asyncio
 import hashlib
 from info import *
 from utils import *
 from typing import Optional, Dict, Set, Tuple, Any
-from datetime import datetime
 from pyrogram import Client, filters
 from database.ia_filterdb import save_file
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from pyrogram.errors import MessageNotModified
 
 # ========== SETTINGS ========== #
-MAX_CALLBACK_SIZE = 64  # Telegram callback data limit
+MAX_CALLBACK_SIZE = 64
 CAPTION_LANGUAGES = ["Bhojpuri", "Hindi", "Bengali", "Tamil", "English", 
                     "Bangla", "Telugu", "Malayalam", "Kannada", "Marathi",
                     "Punjabi", "Bengoli", "Gujrati", "Korean", "Gujarati",
@@ -24,55 +22,107 @@ POSTER_API_URL = "https://image.silentxbotz.tech/api/v1/poster"
 HOW_TO_DOWNLOAD_URL = "https://t.me/+dVRLYHXJztJlMmY9"
 DEFAULT_POSTER_URL = "https://te.legra.ph/file/88d845b4f8a024a71465d.jpg"
 
+# Keywords to remove from movie names
+TITLE_CLEAN_PATTERNS = [
+    r'\d{3,4}p',  # Resolutions like 1080p, 720p
+    r'\bH?\.?264\b', r'\bHEVC\b', r'\bx265\b',  # Codecs
+    r'\bWEB[- ]?DL\b', r'\bHDRip\b', r'\bBluRay\b',  # Formats
+    r'\bDDP?\d\.\d\b', r'\bAAC\b', r'\bAC3\b',  # Audio formats
+    r'\bNF\b', r'\bAMZN\b', r'\bHotstar\b',  # OTT platforms
+    r'\bESub\b', r'\bHQ\b', r'\bORG\b',  # Miscellaneous
+    r'\b\d{4}\b',  # Years
+    r'\.mkv$', r'\.mp4$', r'\.avi$'  # File extensions
+]
+
 # ========== GLOBAL DATA ========== #
 movie_data: Dict[str, dict] = {}
 reaction_counts: Dict[str, dict] = {}
 user_reactions: Dict[str, dict] = {}
 
 # ========== HELPER FUNCTIONS ========== #
-def generate_short_id(movie_name: str) -> str:
-    """Generate short movie ID"""
-    return hashlib.md5(movie_name.encode()).hexdigest()[:6]  # First 6 characters
+def generate_movie_id(movie_name: str) -> str:
+    """Generate unique movie ID using SHA256"""
+    return hashlib.sha256(movie_name.encode()).hexdigest()[:8]
 
-def clean_text(text: str) -> str:
-    """Sanitize text for processing"""
-    return re.sub(r'[^\w\s-]', '', text).strip()
+def clean_movie_title(title: str) -> str:
+    """Clean and normalize movie title by removing unwanted patterns"""
+    # Remove common patterns and keywords
+    for pattern in TITLE_CLEAN_PATTERNS:
+        title = re.sub(pattern, '', title, flags=re.IGNORECASE)
+    
+    # Remove special characters except spaces and hyphens
+    title = re.sub(r'[^\w\s-]', '', title)
+    
+    # Remove extra spaces and trim
+    title = re.sub(r'\s+', ' ', title).strip()
+    
+    # Remove trailing hyphens and numbers
+    title = re.sub(r'[-_\d\s]+$', '', title).strip()
+    
+    return title
 
-async def compress_search_query(query: str) -> str:
-    """Compress search query for callback data"""
-    # Remove special characters and limit to 20 characters
-    compressed = re.sub(r'[^a-z0-9]+', '-', query.lower())[:20]
-    return compressed.rstrip('-')
+def extract_year(title: str) -> Tuple[str, Optional[str]]:
+    """Extract year from title if present"""
+    year_match = re.search(r'\b(19|20)\d{2}\b', title)
+    if year_match:
+        year = year_match.group(0)
+        title = title.replace(year, '').strip()
+        return title, year
+    return title, None
 
 def quality_sort_key(quality: str) -> int:
     """Sort qualities by resolution"""
     order = {"480p": 1, "720p": 2, "1080p": 3, "2160p": 4, "4k": 5}
     return order.get(quality.lower(), 0)
 
+def build_reaction_buttons(movie_id: str, search_query: str) -> InlineKeyboardMarkup:
+    """Dynamically build reaction buttons"""
+    buttons = [
+        [
+            InlineKeyboardButton(f"❤️ {reaction_counts[movie_id]['❤️']}", callback_data=f"h:{movie_id}"),
+            InlineKeyboardButton(f"👍 {reaction_counts[movie_id]['👍']}", callback_data=f"l:{movie_id}"),
+            InlineKeyboardButton(f"👎 {reaction_counts[movie_id]['👎']}", callback_data=f"d:{movie_id}"),
+            InlineKeyboardButton(f"🔥 {reaction_counts[movie_id]['🔥']}", callback_data=f"f:{movie_id}")
+        ],
+        [
+            InlineKeyboardButton('📂 Get File 📂', url=f'https://telegram.me/{temp.U_NAME}?start=getfile-{search_query}')
+        ],
+        [
+            InlineKeyboardButton('♻️ How To Download ♻️', url=HOW_TO_DOWNLOAD_URL)
+        ]
+    ]
+    return InlineKeyboardMarkup(buttons)
+
 # ========== DATA EXTRACTION FUNCTIONS ========== #
-async def extract_items(text: str, items: list) -> Set[str]:
-    """Extract formats/qualities/languages from text"""
-    found = set()
+async def extract_metadata(text: str) -> Tuple[Set[str], Set[str], Set[str], Set[str]]:
+    """Extract all metadata in one pass"""
     text_lower = text.lower()
-    for item in items:
-        if re.search(rf"\b{re.escape(item.lower())}\b", text_lower):
-            found.add(item)
-    return found
+    formats = set()
+    qualities = set()
+    languages = set()
+    ott = set()
 
-async def extract_formats(text: str) -> Set[str]:
-    formats = ["ORG", "HDRip", "WEB-DL", "WEBRip", "HDCAM", "HQ", 
-              "CAMRip", "HDTC", "DVDscr", "dvdrip", "dvdscreen", "HDTS"]
-    return await extract_items(text, formats)
+    # Check formats
+    format_keywords = {
+        "ORG", "HDRip", "WEB-DL", "WEBRip", "HDCAM", "HQ", 
+        "CAMRip", "HDTC", "DVDscr", "dvdrip", "dvdscreen", "HDTS"
+    }
+    for fmt in format_keywords:
+        if re.search(rf"\b{re.escape(fmt.lower())}\b", text_lower):
+            formats.add(fmt)
 
-async def extract_qualities(text: str) -> Set[str]:
-    qualities = ["480p", "720p", "1080p", "2160p", "4K", "2K"]
-    return await extract_items(text, qualities)
+    # Check qualities
+    quality_keywords = {"480p", "720p", "1080p", "2160p", "4k", "2k"}
+    for qual in quality_keywords:
+        if re.search(rf"\b{re.escape(qual)}\b", text_lower):
+            qualities.add(qual)
 
-async def extract_languages(text: str) -> Set[str]:
-    return await extract_items(text, CAPTION_LANGUAGES)
+    # Check languages
+    for lang in CAPTION_LANGUAGES:
+        if re.search(rf"\b{re.escape(lang.lower())}\b", text_lower):
+            languages.add(lang)
 
-async def extract_ott(text: str) -> Set[str]:
-    """Extract OTT platforms from text"""
+    # Check OTT platforms
     ott_keywords = {
         "Netflix": ["nf", "netflix"],
         "SonyLiv": ["sonyliv", "sony", "sliv"],
@@ -90,65 +140,57 @@ async def extract_ott(text: str) -> Set[str]:
         "ChaupalTV": ["chtv", "chpl", "chaupal"],
         "KABLEONE": ["kableone"]
     }
-    found = set()
-    text_lower = text.lower()
-    for platform, keywords in ott_keywords.items():
-        if any(re.search(rf"\b{re.escape(k)}\b", text_lower) for k in keywords):
-            found.add(platform)
-    return found
+    for platform, keys in ott_keywords.items():
+        if any(re.search(rf"\b{re.escape(k)}\b", text_lower) for k in keys):
+            ott.add(platform)
+
+    return formats, qualities, languages, ott
 
 # ========== MOVIE UPDATE HANDLER ========== #
 @Client.on_message(filters.chat(CHANNELS) & (filters.document | filters.video | filters.audio))
 async def media_handler(bot: Client, message):
     """Handle new media updates from channels"""
-    media = next(
-        (getattr(message, attr) for attr in ("document", "video", "audio") if getattr(message, attr, None)),
-        None
-    )
-    
-    if not media:
-        return
-    
-    # Add custom attributes to media object
-    media.file_type = next(attr for attr in ("document", "video", "audio") if getattr(message, attr, None))
-    media.caption = message.caption or ""
-    
     try:
+        media = message.document or message.video or message.audio
+        if not media:
+            return
+
+        # Add custom attributes to media object
+        media.file_type = "document" if message.document else "video" if message.video else "audio"
+        media.caption = message.caption or ""
+        media.file_name = getattr(media, "file_name", "") or ""
+        
         success, _ = await save_file(media)
-        if success and await get_status(bot.me.id):
-            await process_movie_update(bot, media.file_name, media.caption)
+        if not success or not await get_status(bot.me.id):
+            return
+            
+        await process_movie_update(bot, media.file_name, media.caption)
     except Exception as e:
         print(f"❌ Media handler error: {e}")
 
 async def process_movie_update(bot: Client, file_name: str, caption: str):
     """Process and update movie information"""
     try:
-        # Clean and validate inputs
-        clean_name = clean_text(file_name)
-        clean_caption = clean_text(caption)
+        # Clean and normalize movie title
+        clean_name = clean_movie_title(file_name)
+        clean_name, year = extract_year(clean_name)
         
         if not clean_name:
             print("⚠️ Invalid file name")
             return
 
-        # Generate movie ID
-        movie_id = generate_short_id(clean_name)
+        # Generate unique movie ID
+        movie_id = generate_movie_id(clean_name)
+        search_query = hashlib.md5(clean_name.encode()).hexdigest()[:12]
         
-        # Create search query
-        search_query = await compress_search_query(clean_name)
-        
-        # Extract metadata
-        year_match = re.search(r"\b(19|20)\d{2}\b", clean_caption)
-        year = year_match.group(0) if year_match else None
-        
-        formats = await extract_formats(clean_caption)
-        qualities = await extract_qualities(clean_caption)
-        languages = await extract_languages(clean_caption)
-        ott = await extract_ott(clean_caption)
+        # Extract metadata in single pass
+        formats, qualities, languages, ott = await extract_metadata(f"{clean_name} {caption}")
         
         # Initialize movie data
         if movie_id not in movie_data:
             movie_data[movie_id] = {
+                'title': clean_name,
+                'year': year,
                 'formats': set(),
                 'qualities': set(),
                 'languages': set(),
@@ -165,22 +207,24 @@ async def process_movie_update(bot: Client, file_name: str, caption: str):
         movie_data[movie_id]['languages'].update(languages)
         movie_data[movie_id]['ott'].update(ott)
         
-        # Get IMDb details
-        imdb_data = await get_imdb_details(clean_name)
-        title = imdb_data.get("title", clean_name)
-        rating = imdb_data.get("rating", "N/A")
-        genres = imdb_data.get("genres", "N/A")
+        # Get IMDb details using clean title
+        imdb_data = await get_imdb_details(clean_name) or {}
+        
+        # Build display title with year if available
+        display_title = clean_name
+        if year:
+            display_title = f"{clean_name} ({year})"
+        elif imdb_data.get("year"):
+            display_title = f"{clean_name} ({imdb_data['year']})"
         
         # Build caption
-        caption_lines = [f"<b>【{clean_name}】🆕️</b>", ""]
+        caption_lines = [f"<b>【{display_title}】🆕️</b>", ""]
         
         if ott_str := ", ".join(sorted(movie_data[movie_id]['ott'])): 
             caption_lines.append(f"<b>📀 OTT - {ott_str}</b>")
         
-        if rating != "N/A" and rating:
-            if not rating.endswith('★'):
-                rating += '★'
-            caption_lines.append(f"<b>⭐️ Rating - {rating}</b>")
+        if rating := imdb_data.get("rating"):
+            caption_lines.append(f"<b>⭐️ Rating - {rating}★</b>")
         
         if format_str := ", ".join(sorted(movie_data[movie_id]['formats'])): 
             caption_lines.append(f"<b>📺 Format - {format_str}</b>")
@@ -191,63 +235,55 @@ async def process_movie_update(bot: Client, file_name: str, caption: str):
         if language_str := ", ".join(sorted(movie_data[movie_id]['languages'])): 
             caption_lines.append(f"<b>🔈 Audio - {language_str}</b>")
         
-        if genres != "N/A" and genres:
+        if genres := imdb_data.get("genres"):
             caption_lines.append(f"<b>🎭 Genres - {genres}</b>")
         
         caption_lines.extend(["", f"<blockquote>👑 Provided By : {PROVIDER_NAME}</blockquote>"])
         full_caption = "\n".join(caption_lines)
         
         # Create buttons
-        buttons = [
-            [
-                InlineKeyboardButton(f"❤️ {reaction_counts[movie_id]['❤️']}", callback_data=f"h:{movie_id}"),
-                InlineKeyboardButton(f"👍 {reaction_counts[movie_id]['👍']}", callback_data=f"l:{movie_id}"),
-                InlineKeyboardButton(f"👎 {reaction_counts[movie_id]['👎']}", callback_data=f"d:{movie_id}"),
-                InlineKeyboardButton(f"🔥 {reaction_counts[movie_id]['🔥']}", callback_data=f"f:{movie_id}")
-            ],
-            [
-                InlineKeyboardButton('📂 Get File 📂', url=f'https://telegram.me/{temp.U_NAME}?start=getfile-{search_query}')
-            ],
-            [
-                InlineKeyboardButton('♻️ How To Download ♻️', url=HOW_TO_DOWNLOAD_URL)
-            ]
-        ]
+        buttons = build_reaction_buttons(movie_id, search_query)
         
         # Edit existing message
-        if msg_id := movie_data[movie_id]['message_id']:
+        if msg_id := movie_data[movie_id].get('message_id'):
             try:
                 await bot.edit_message_caption(
                     chat_id=MOVIE_UPDATE_CHANNEL,
                     message_id=msg_id,
                     caption=full_caption,
-                    reply_markup=InlineKeyboardMarkup(buttons)
+                    reply_markup=buttons
                 )
-                print(f"✅ Updated: {clean_name}")
+                print(f"✅ Updated: {display_title}")
                 return
+            except MessageNotModified:
+                pass  # No changes needed
             except Exception as e:
                 print(f"⚠️ Edit failed: {e}")
                 movie_data[movie_id]['message_id'] = None  # Reset if edit fails
         
         # Send new message
-        poster = await fetch_movie_poster(title, year)
+        poster_title = imdb_data.get("title", clean_name)
+        poster_year = imdb_data.get("year", year)
+        poster = await fetch_movie_poster(poster_title, poster_year)
+        
         try:
             if poster:
-                photo_file = io.BytesIO(poster)
-                photo_file.name = f"poster_{movie_id}.jpg"
                 sent = await bot.send_photo(
                     chat_id=MOVIE_UPDATE_CHANNEL,
-                    photo=photo_file,
+                    photo=io.BytesIO(poster),
                     caption=full_caption,
-                    reply_markup=InlineKeyboardMarkup(buttons))
+                    reply_markup=buttons
+                )
             else:
                 sent = await bot.send_photo(
                     chat_id=MOVIE_UPDATE_CHANNEL,
                     photo=DEFAULT_POSTER_URL,
                     caption=full_caption,
-                    reply_markup=InlineKeyboardMarkup(buttons))
+                    reply_markup=buttons
+                )
             
             movie_data[movie_id]['message_id'] = sent.id
-            print(f"📤 New movie: {clean_name}")
+            print(f"📤 New movie: {display_title}")
         except Exception as e:
             print(f"❌ Message sending error: {e}")
             
@@ -255,7 +291,7 @@ async def process_movie_update(bot: Client, file_name: str, caption: str):
         print(f"❌ Movie update error: {e}")
 
 # ========== REACTION HANDLER ========== #
-@Client.on_callback_query(filters.regex(r"^[hldf]:"))
+@Client.on_callback_query(filters.regex(r"^(h|l|d|f):"))
 async def reaction_handler(client, query):
     """Handle reaction button clicks"""
     try:
@@ -263,28 +299,18 @@ async def reaction_handler(client, query):
         reaction_code, movie_id = query.data.split(":", 1)
         
         # Validate movie ID
-        if movie_id not in reaction_counts or movie_id not in user_reactions:
+        if movie_id not in reaction_counts:
             await query.answer("⚠️ Movie not found!", show_alert=True)
             return
         
         # Map codes to emojis
-        emoji_map = {
-            "h": "❤️",
-            "l": "👍",
-            "d": "👎",
-            "f": "🔥"
-        }
+        emoji_map = {"h": "❤️", "l": "👍", "d": "👎", "f": "🔥"}
         new_emoji = emoji_map.get(reaction_code)
         if not new_emoji:
             return
         
         user_id = query.from_user.id
         current_reaction = user_reactions[movie_id].get(user_id)
-        
-        # Check if same reaction
-        if current_reaction == new_emoji:
-            await query.answer("👍 You've already reacted!")
-            return
         
         # Update counters
         if current_reaction:
@@ -293,25 +319,13 @@ async def reaction_handler(client, query):
         reaction_counts[movie_id][new_emoji] += 1
         user_reactions[movie_id][user_id] = new_emoji
         
-        # Create updated buttons
-        buttons = [
-            [
-                InlineKeyboardButton(f"❤️ {reaction_counts[movie_id]['❤️']}", callback_data=f"h:{movie_id}"),
-                InlineKeyboardButton(f"👍 {reaction_counts[movie_id]['👍']}", callback_data=f"l:{movie_id}"),
-                InlineKeyboardButton(f"👎 {reaction_counts[movie_id]['👎']}", callback_data=f"d:{movie_id}"),
-                InlineKeyboardButton(f"🔥 {reaction_counts[movie_id]['🔥']}", callback_data=f"f:{movie_id}")
-            ],
-            [
-                InlineKeyboardButton('📂 Get File 📂', 
-                                    url=f'https://telegram.me/{temp.U_NAME}?start=getfile-{movie_data[movie_id]["search_query"]}')
-            ],
-            [
-                InlineKeyboardButton('♻️ How To Download ♻️', url=HOW_TO_DOWNLOAD_URL)
-            ]
-        ]
-        
         # Update message buttons
-        await query.message.edit_reply_markup(reply_markup=InlineKeyboardMarkup(buttons))
+        await query.message.edit_reply_markup(
+            reply_markup=build_reaction_buttons(
+                movie_id, 
+                movie_data[movie_id]["search_query"]
+            )
+        )
         await query.answer(f"✅ {new_emoji} reaction updated!")
         
     except Exception as e:
@@ -319,28 +333,21 @@ async def reaction_handler(client, query):
         await query.answer("⚠️ Error! Please try later", show_alert=True)
 
 # ========== POSTER FUNCTIONS ========== #
-async def get_imdb_details(name: str) -> dict:
-    """Fetch IMDb data for movie"""
-    try:
-        formatted_name = clean_text(name)
-        imdb = await get_poster(formatted_name)
-        return imdb or {}
-    except Exception as e:
-        print(f"❌ IMDb fetch error: {e}")
-        return {}
-
 async def fetch_movie_poster(title: str, year: Optional[str] = None) -> Optional[bytes]:
-    """Fetch movie poster image"""
+    """Fetch movie poster image with better error handling"""
+    if not title:
+        return None
+        
     try:
-        params = {"title": clean_text(title)}
+        params = {"title": title.strip()}
         if year:
             params["year"] = str(year)
             
         async with aiohttp.ClientSession() as session:
-            async with session.get(POSTER_API_URL, params=params, timeout=10) as response:
+            async with session.get(POSTER_API_URL, params=params, timeout=15) as response:
                 if response.status == 200:
                     return await response.read()
                 print(f"⚠️ Poster API error: HTTP {response.status}")
-    except (aiohttp.ClientError, asyncio.TimeoutError) as e:
+    except Exception as e:
         print(f"🌐 Network error: {type(e).__name__}")
     return None
