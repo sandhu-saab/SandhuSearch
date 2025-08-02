@@ -13,25 +13,33 @@ from pyrogram.errors import MessageNotModified
 
 # ========== SETTINGS ========== #
 MAX_CALLBACK_SIZE = 64
-CAPTION_LANGUAGES = ["Bhojpuri", "Hindi", "Bengali", "Tamil", "English",
-                     "Bangla", "Telugu", "Malayalam", "Kannada", "Marathi",
-                     "Punjabi", "Bengoli", "Gujrati", "Korean", "Gujarati",
-                     "Spanish", "French", "German", "Chinese", "Arabic",
-                     "Portuguese", "Russian", "Japanese", "Odia", "Assamese", "Urdu"]
+CAPTION_LANGUAGES = [
+    "Bhojpuri", "Hindi", "Bengali", "Tamil", "English",
+    "Bangla", "Telugu", "Malayalam", "Kannada", "Marathi",
+    "Punjabi", "Bengoli", "Gujrati", "Korean", "Gujarati",
+    "Spanish", "French", "German", "Chinese", "Arabic",
+    "Portuguese", "Russian", "Japanese", "Odia", "Assamese", "Urdu"
+]
 POSTER_API_URL = "https://image.silentxbotz.tech/api/v1/poster"
 HOW_TO_DOWNLOAD_URL = "https://t.me/+dVRLYHXJztJlMmY9"
 DEFAULT_POSTER_URL = "https://te.legra.ph/file/88d845b4f8a024a71465d.jpg"
 
+# Patterns for cleaning movie titles
 TITLE_CLEAN_PATTERNS = [
-    r'\d{3,4}p', r'\bH?\.?264\b', r'\bHEVC\b', r'\bx265\b',
+    r'\d{3,4}p',
+    r'\bH?\.?264\b', r'\bHEVC\b', r'\bx265\b',
     r'\bWEB[- ]?DL\b', r'\bHDRip\b', r'\bBluRay\b',
     r'\bDDP?\d\.\d\b', r'\bAAC\b', r'\bAC3\b',
     r'\bNF\b', r'\bAMZN\b', r'\bHotstar\b',
     r'\bESub\b', r'\bHQ\b', r'\bORG\b',
-    r'\bS\d{1,2}\b', r'\bSeason\s?\d{1,2}\b',
-    r'\b\d{4}\b', r'\.mkv$', r'\.mp4$', r'\.avi$',
-    r'[-_]\s*x264\b', r'[-_]\s*(Tam|Tel|Hin|Eng)\b',
-    r'[-_]\s*[A-Za-z]\s*$', r'^\W+|\W+$',
+    r'\bS\d{1,2}\b',
+    r'\bSeason\s?\d{1,2}\b',
+    r'\b\d{4}\b',
+    r'\.mkv$', r'\.mp4$', r'\.avi$',
+    r'[-_]\s*x264\b',
+    r'[-_]\s*(Tam|Tel|Hin|Eng)\b',
+    r'[-_]\s*[A-Za-z]\s*$',
+    r'^\W+|\W+$',
     r'\s*[-_]\s*[-_]\s*',
 ]
 
@@ -90,22 +98,27 @@ def build_reaction_buttons(movie_id: str, search_query: str) -> InlineKeyboardMa
             InlineKeyboardButton(f"👎 {reaction_counts[movie_id]['👎']}", callback_data=f"d:{movie_id}"),
             InlineKeyboardButton(f"🔥 {reaction_counts[movie_id]['🔥']}", callback_data=f"f:{movie_id}")
         ],
-        [InlineKeyboardButton('📂 Get File 📂', url=f'https://telegram.me/{temp.U_NAME}?start=getfile-{search_query}')],
-        [InlineKeyboardButton('♻️ How To Download ♻️', url=HOW_TO_DOWNLOAD_URL)]
+        [
+            InlineKeyboardButton('📂 Get File 📂', url=f'https://telegram.me/{temp.U_NAME}?start=getfile-{search_query}')
+        ],
+        [
+            InlineKeyboardButton('♻️ How To Download ♻️', url=HOW_TO_DOWNLOAD_URL)
+        ]
     ]
     return InlineKeyboardMarkup(buttons)
 
-# ========== DATA EXTRACTION FUNCTIONS ========== #
 async def extract_metadata(text: str) -> Tuple[Set[str], Set[str], Set[str], Set[str]]:
     text_lower = text.lower()
     formats, qualities, languages, ott = set(), set(), set(), set()
 
-    format_keywords = {"ORG", "HDRip", "WEB-DL", "WEBRip", "HDCAM", "HQ", "CAMRip", "HDTC", "DVDscr", "dvdrip", "dvdscreen", "HDTS"}
+    format_keywords = {"ORG", "HDRip", "WEB-DL", "WEBRip", "HDCAM", "HQ",
+                       "CAMRip", "HDTC", "DVDscr", "dvdrip", "dvdscreen", "HDTS"}
     for fmt in format_keywords:
         if re.search(rf"\b{re.escape(fmt.lower())}\b", text_lower):
             formats.add(fmt)
 
-    for qual in {"480p", "720p", "1080p", "2160p", "4k", "2k"}:
+    quality_keywords = {"480p", "720p", "1080p", "2160p", "4k", "2k"}
+    for qual in quality_keywords:
         if re.search(rf"\b{re.escape(qual)}\b", text_lower):
             qualities.add(qual)
 
@@ -114,11 +127,21 @@ async def extract_metadata(text: str) -> Tuple[Set[str], Set[str], Set[str], Set
             languages.add(lang)
 
     ott_keywords = {
-        "Netflix": ["nf", "netflix"], "SonyLiv": ["sonyliv", "sony", "sliv"],
-        "Amazon Prime Video": ["amzn", "prime", "primevideo"], "Disney+ Hotstar": ["hotstar"],
-        "Zee5": ["zee5"], "JioHotstar": ["jio", "jhs"], "Aha": ["aha"], "HBO Max": ["hbo"],
-        "Paramount+": ["paramount"], "Apple TV+": ["apple"], "Hoichoi": ["hoichoi"], "Sun NXT": ["sunnxt"],
-        "Viki": ["viki"], "ChaupalTV": ["chtv", "chpl", "chaupal"], "KABLEONE": ["kableone"]
+        "Netflix": ["nf", "netflix"],
+        "SonyLiv": ["sonyliv", "sony", "sliv"],
+        "Amazon Prime Video": ["amzn", "prime", "primevideo"],
+        "Disney+ Hotstar": ["hotstar"],
+        "Zee5": ["zee5"],
+        "JioHotstar": ["jio", "jhs"],
+        "Aha": ["aha"],
+        "HBO Max": ["hbo"],
+        "Paramount+": ["paramount"],
+        "Apple TV+": ["apple"],
+        "Hoichoi": ["hoichoi"],
+        "Sun NXT": ["sunnxt"],
+        "Viki": ["viki"],
+        "ChaupalTV": ["chtv", "chpl", "chaupal"],
+        "KABLEONE": ["kableone"]
     }
     for platform, keys in ott_keywords.items():
         if any(re.search(rf"\b{re.escape(k)}\b", text_lower) for k in keys):
@@ -150,7 +173,6 @@ async def process_movie_update(bot: Client, file_name: str, caption: str):
     try:
         clean_name = clean_movie_title(file_name)
         clean_name, year = extract_year(clean_name)
-
         if not clean_name or len(clean_name) < 3:
             clean_name = clean_movie_title(caption)
             clean_name, year = extract_year(clean_name)
@@ -161,13 +183,18 @@ async def process_movie_update(bot: Client, file_name: str, caption: str):
 
         movie_id = generate_movie_id(clean_name)
         search_query = hashlib.md5(clean_name.encode()).hexdigest()[:12]
-
         formats, qualities, languages, ott = await extract_metadata(f"{clean_name} {caption}")
 
         if movie_id not in movie_data:
             movie_data[movie_id] = {
-                'title': clean_name, 'year': year, 'formats': set(), 'qualities': set(),
-                'languages': set(), 'ott': set(), 'message_id': None, 'search_query': search_query
+                'title': clean_name,
+                'year': year,
+                'formats': set(),
+                'qualities': set(),
+                'languages': set(),
+                'ott': set(),
+                'message_id': None,
+                'search_query': search_query
             }
             reaction_counts[movie_id] = {"❤️": 0, "👍": 0, "👎": 0, "🔥": 0}
             user_reactions[movie_id] = {}
@@ -183,33 +210,47 @@ async def process_movie_update(bot: Client, file_name: str, caption: str):
         except Exception as e:
             print(f"❌ IMDb fetch error: {e}")
 
-        display_title = f"{clean_name} ({year or imdb_data.get('year', '')})".strip()
+        display_title = clean_name
+        if year:
+            display_title = f"{clean_name} ({year})"
+        elif imdb_data.get("year"):
+            display_title = f"{clean_name} ({imdb_data['year']})"
 
         caption_lines = [f"<b>【{display_title}】🆕️</b>"]
-        if movie_data[movie_id]['ott']:
-            caption_lines.append(f"<b>📀 OTT - {', '.join(sorted(movie_data[movie_id]['ott']))}</b>")
-        if imdb_data.get("rating"):
-            rating = imdb_data["rating"] if '★' in imdb_data["rating"] else f"{imdb_data['rating']}★"
+
+        ott_str = ", ".join(sorted(movie_data[movie_id]['ott']))
+        if ott_str:
+            caption_lines.append(f"<b>📀 OTT - {ott_str}</b>")
+
+        rating = imdb_data.get("rating")
+        if rating:
+            rating = rating if '★' in rating else f"{rating}★"
             caption_lines.append(f"<b>⭐️ Rating - {rating}</b>")
-        if movie_data[movie_id]['formats']:
-            caption_lines.append(f"<b>📺 Format - {', '.join(sorted(movie_data[movie_id]['formats']))}</b>")
-        if movie_data[movie_id]['qualities']:
-            caption_lines.append(f"<b>🔰 Quality - {', '.join(sorted(movie_data[movie_id]['qualities'], key=quality_sort_key))}</b>")
-        if movie_data[movie_id]['languages']:
-            caption_lines.append(f"<b>🔈 Audio - {', '.join(sorted(movie_data[movie_id]['languages']))}</b>")
-        if imdb_data.get("genres"):
-            caption_lines.append(f"<b>🎭 Genres - {imdb_data['genres']}</b>")
+
+        format_str = ", ".join(sorted(movie_data[movie_id]['formats']))
+        if format_str:
+            caption_lines.append(f"<b>📺 Format - {format_str}</b>")
+
+        quality_str = ", ".join(sorted(movie_data[movie_id]['qualities'], key=quality_sort_key))
+        if quality_str:
+            caption_lines.append(f"<b>🔰 Quality - {quality_str}</b>")
+
+        language_str = ", ".join(sorted(movie_data[movie_id]['languages']))
+        if language_str:
+            caption_lines.append(f"<b>🔈 Audio - {language_str}</b>")
+
+        genres = imdb_data.get("genres")
+        if genres:
+            caption_lines.append(f"<b>🎭 Genres - {genres}</b>")
+
         caption_lines.append("")
         caption_lines.append(f"<blockquote>👑 Provided By : {PROVIDER_NAME}</blockquote>")
         full_caption = "\n".join(caption_lines)
 
         buttons = build_reaction_buttons(movie_id, search_query)
-
-        poster = await fetch_movie_poster(clean_name, year)
-        photo_data = None
-        if poster:
-            photo_data = io.BytesIO(poster)
-            photo_data.name = "poster.jpg"
+        poster_title = imdb_data.get("title", clean_name)
+        poster_year = imdb_data.get("year", year)
+        poster = await fetch_movie_poster(poster_title, poster_year)
 
         if movie_data[movie_id]['message_id']:
             try:
@@ -229,7 +270,7 @@ async def process_movie_update(bot: Client, file_name: str, caption: str):
 
         sent = await bot.send_photo(
             chat_id=MOVIE_UPDATE_CHANNEL,
-            photo=photo_data if photo_data else DEFAULT_POSTER_URL,
+            photo=poster or DEFAULT_POSTER_URL,
             caption=full_caption,
             reply_markup=buttons
         )
@@ -246,17 +287,27 @@ async def reaction_handler(client, query):
         if movie_id not in reaction_counts:
             await query.answer("⚠️ Movie not found!", show_alert=True)
             return
+
         emoji_map = {"h": "❤️", "l": "👍", "d": "👎", "f": "🔥"}
         new_emoji = emoji_map.get(reaction_code)
         if not new_emoji:
             return
+
         user_id = query.from_user.id
         current_reaction = user_reactions[movie_id].get(user_id)
+
         if current_reaction:
             reaction_counts[movie_id][current_reaction] -= 1
+
         reaction_counts[movie_id][new_emoji] += 1
         user_reactions[movie_id][user_id] = new_emoji
-        await query.message.edit_reply_markup(reply_markup=build_reaction_buttons(movie_id, movie_data[movie_id]["search_query"]))
+
+        await query.message.edit_reply_markup(
+            reply_markup=build_reaction_buttons(
+                movie_id,
+                movie_data[movie_id]["search_query"]
+            )
+        )
         await query.answer(f"✅ {new_emoji} reaction updated!")
     except Exception as e:
         print(f"❌ Reaction error: {e}")
