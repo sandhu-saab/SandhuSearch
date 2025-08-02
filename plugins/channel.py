@@ -4,7 +4,7 @@ import aiohttp
 import asyncio
 import hashlib
 from info import *
-from utils import *
+from utils import *  # Make sure get_poster is imported from utils
 from typing import Optional, Dict, Set, Tuple, Any
 from pyrogram import Client, filters
 from database.ia_filterdb import save_file
@@ -22,16 +22,23 @@ POSTER_API_URL = "https://image.silentxbotz.tech/api/v1/poster"
 HOW_TO_DOWNLOAD_URL = "https://t.me/+dVRLYHXJztJlMmY9"
 DEFAULT_POSTER_URL = "https://te.legra.ph/file/88d845b4f8a024a71465d.jpg"
 
-# Keywords to remove from movie names
+# Enhanced patterns to remove season indicators and other unwanted text
 TITLE_CLEAN_PATTERNS = [
-    r'\d{3,4}p',  # Resolutions like 1080p, 720p
-    r'\bH?\.?264\b', r'\bHEVC\b', r'\bx265\b',  # Codecs
-    r'\bWEB[- ]?DL\b', r'\bHDRip\b', r'\bBluRay\b',  # Formats
-    r'\bDDP?\d\.\d\b', r'\bAAC\b', r'\bAC3\b',  # Audio formats
-    r'\bNF\b', r'\bAMZN\b', r'\bHotstar\b',  # OTT platforms
-    r'\bESub\b', r'\bHQ\b', r'\bORG\b',  # Miscellaneous
-    r'\b\d{4}\b',  # Years
-    r'\.mkv$', r'\.mp4$', r'\.avi$'  # File extensions
+    r'\d{3,4}p',                   # Resolutions like 1080p, 720p
+    r'\bH?\.?264\b',                # Codecs
+    r'\bHEVC\b', r'\bx265\b',       # Codecs
+    r'\bWEB[- ]?DL\b',              # Formats
+    r'\bHDRip\b', r'\bBluRay\b',    # Formats
+    r'\bDDP?\d\.\d\b',              # Audio formats
+    r'\bAAC\b', r'\bAC3\b',         # Audio formats
+    r'\bNF\b', r'\bAMZN\b',         # OTT platforms
+    r'\bHotstar\b',                 # OTT platforms
+    r'\bESub\b', r'\bHQ\b',         # Miscellaneous
+    r'\bORG\b',                     # Miscellaneous
+    r'\bS\d{1,2}\b',                # Season indicators (S01, S02, etc.)
+    r'\bSeason\s?\d{1,2}\b',        # Season indicators
+    r'\b\d{4}\b',                   # Years
+    r'\.mkv$', r'\.mp4$', r'\.avi$' # File extensions
 ]
 
 # ========== GLOBAL DATA ========== #
@@ -45,10 +52,19 @@ def generate_movie_id(movie_name: str) -> str:
     return hashlib.sha256(movie_name.encode()).hexdigest()[:8]
 
 def clean_movie_title(title: str) -> str:
-    """Clean and normalize movie title by removing unwanted patterns"""
+    """
+    Clean and normalize movie title by removing unwanted patterns
+    and preserving the core title only
+    """
+    # First remove year if present at the end
+    title = re.sub(r'\s*\(\d{4}\)\s*$', '', title)
+    
     # Remove common patterns and keywords
     for pattern in TITLE_CLEAN_PATTERNS:
         title = re.sub(pattern, '', title, flags=re.IGNORECASE)
+    
+    # Remove season indicators in parentheses
+    title = re.sub(r'\s*\(?S\d{1,2}\)?\s*', '', title, flags=re.IGNORECASE)
     
     # Remove special characters except spaces and hyphens
     title = re.sub(r'[^\w\s-]', '', title)
@@ -208,7 +224,11 @@ async def process_movie_update(bot: Client, file_name: str, caption: str):
         movie_data[movie_id]['ott'].update(ott)
         
         # Get IMDb details using clean title
-        imdb_data = await get_imdb_details(clean_name) or {}
+        imdb_data = {}
+        try:
+            imdb_data = await get_poster(clean_name) or {}
+        except Exception as e:
+            print(f"❌ IMDb fetch error: {e}")
         
         # Build display title with year if available
         display_title = clean_name
@@ -224,7 +244,9 @@ async def process_movie_update(bot: Client, file_name: str, caption: str):
             caption_lines.append(f"<b>📀 OTT - {ott_str}</b>")
         
         if rating := imdb_data.get("rating"):
-            caption_lines.append(f"<b>⭐️ Rating - {rating}★</b>")
+            # Ensure rating ends with ★
+            rating = rating if '★' in rating else f"{rating}★"
+            caption_lines.append(f"<b>⭐️ Rating - {rating}</b>")
         
         if format_str := ", ".join(sorted(movie_data[movie_id]['formats'])): 
             caption_lines.append(f"<b>📺 Format - {format_str}</b>")
