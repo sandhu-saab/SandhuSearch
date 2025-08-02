@@ -1,266 +1,143 @@
 import re
 import io
+import math
+import random
+import string
 import aiohttp
 import asyncio
 import hashlib
-from info import *
-from utils import *
-from typing import Optional, Dict, Set, Tuple, Any
+from datetime import datetime
+from typing import Optional, Dict
 from pyrogram import Client, filters
-from database.ia_filterdb import save_file
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from pyrogram.errors import MessageNotModified
 
-# ========== SETTINGS ========== #
-MAX_CALLBACK_SIZE = 64
-CAPTION_LANGUAGES = [
-    "Bhojpuri", "Hindi", "Bengali", "Tamil", "English",
-    "Bangla", "Telugu", "Malayalam", "Kannada", "Marathi",
-    "Punjabi", "Bengoli", "Gujrati", "Korean", "Gujarati",
-    "Spanish", "French", "German", "Chinese", "Arabic",
-    "Portuguese", "Russian", "Japanese", "Odia", "Assamese", "Urdu"
-]
-POSTER_API_URL = "https://image.silentxbotz.tech/api/v1/poster"
-HOW_TO_DOWNLOAD_URL = "https://t.me/+dVRLYHXJztJlMmY9"
-DEFAULT_POSTER_URL = "https://te.legra.ph/file/88d845b4f8a024a71465d.jpg"
+from info import *
+from utils import *
+from database.ia_filterdb import save_file
 
-# Patterns for cleaning movie titles
-TITLE_CLEAN_PATTERNS = [
-    r'\d{3,4}p',
-    r'\bH?\.?264\b', r'\bHEVC\b', r'\bx265\b',
-    r'\bWEB[- ]?DL\b', r'\bHDRip\b', r'\bBluRay\b',
-    r'\bDDP?\d\.\d\b', r'\bAAC\b', r'\bAC3\b',
-    r'\bNF\b', r'\bAMZN\b', r'\bHotstar\b',
-    r'\bESub\b', r'\bHQ\b', r'\bORG\b',
-    r'\bS\d{1,2}\b',
-    r'\bSeason\s?\d{1,2}\b',
-    r'\b\d{4}\b',
-    r'\.mkv$', r'\.mp4$', r'\.avi$',
-    r'[-_]\s*x264\b',
-    r'[-_]\s*(Tam|Tel|Hin|Eng)\b',
-    r'[-_]\s*[A-Za-z]\s*$',
-    r'^\W+|\W+$',
-    r'\s*[-_]\s*[-_]\s*',
-]
+# ✅ Languages list for caption parsing
+CAPTION_LANGUAGES = ["Bhojpuri", "Hindi", "Bengali", "Tamil", "English", "Bangla", "Telugu", "Malayalam", "Kannada", "Marathi", "Punjabi", "Gujrati", "Korean", "Gujarati", "Spanish", "French", "German", "Chinese", "Arabic", "Portuguese", "Russian", "Japanese", "Odia", "Assamese", "Urdu"]
 
-IGNORE_WORDS = {
-    "rarbg", "dub", "sub", "sample", "mkv", "aac", "combined",
-    "action", "adventure", "animation", "biography", "comedy", "crime",
-    "documentary", "drama", "family", "fantasy", "film-noir", "history",
-    "horror", "music", "musical", "mystery", "romance", "sci-fi", "sport",
-    "thriller", "war", "western", "hdcam", "hdtc", "camrip", "ts", "tc",
-    "telesync", "dvdscr", "dvdrip", "predvd", "webrip", "web-dl", "tvrip",
-    "hdtv", "webdl", "bluray", "brrip", "bdrip", "360p", "480p",
-    "720p", "1080p", "2160p", "4k", "1440p", "540p", "240p", "140p", "hevc",
-    "hdrip", "hin", "hindi", "tam", "tamil", "kan", "kannada", "tel", "telugu",
-    "mal", "malayalam", "eng", "english", "pun", "punjabi", "ben", "bengali",
-    "mar", "marathi", "guj", "gujarati", "urd", "urdu", "kor", "korean", "jpn",
-    "japanese", "nf", "netflix", "sonyliv", "sony", "sliv", "amzn", "prime",
-    "primevideo", "hotstar", "zee5", "jio", "jhs", "aha", "hbo", "paramount",
-    "apple", "hoichoi", "sunnxt", "viki"
-}
+# ✅ Update caption format
+UPDATE_CAPTION = """<b>【{TITLE} ({YEAR})】🆕️
 
-# ========== GLOBAL DATA ========== #
-movie_data: Dict[str, dict] = {}
-reaction_counts: Dict[str, dict] = {}
-user_reactions: Dict[str, dict] = {}
+📺 Format - {FORMATS}
+🔰 Quality - {QUALITIES}
+🔈 Audio - {LANGUAGES}
+🎭 Genres - {GENRES}
+⭐️ Rating - {RATING}★
+📡 OTT - {OTT}
 
-# ========== HELPER FUNCTIONS ========== #
-def generate_movie_id(movie_name: str) -> str:
-    return hashlib.sha256(movie_name.encode()).hexdigest()[:8]
+👑 Provided By : {PROVIDER}</b>
+"""
 
-def clean_movie_title(title: str) -> str:
-    for pattern in TITLE_CLEAN_PATTERNS:
-        title = re.sub(pattern, '', title, flags=re.IGNORECASE)
-    for word in IGNORE_WORDS:
-        title = re.sub(rf'\b{re.escape(word)}\b', '', title, flags=re.IGNORECASE)
-    title = re.sub(r'[^\w\s-]', ' ', title)
-    title = re.sub(r'\s+', ' ', title).strip()
-    return title.title()
+# ✅ Global dicts for movie tracking & reactions
+movie_data: Dict[str, Dict] = {}
+reaction_counts: Dict[str, Dict] = {}
+user_reactions: Dict[str, Dict] = {}
 
-def extract_year(title: str) -> Tuple[str, Optional[str]]:
-    year_match = re.search(r'\b(19|20)\d{2}\b', title)
-    if year_match:
-        year = year_match.group(0)
-        title = title.replace(year, '').strip()
-        return title, year
-    return title, None
+media_filter = filters.document | filters.video | filters.audio
 
-def quality_sort_key(quality: str) -> int:
-    order = {"480p": 1, "720p": 2, "1080p": 3, "2160p": 4, "4k": 5}
-    return order.get(quality.lower(), 0)
+@Client.on_message(filters.chat(CHANNELS) & media_filter)
+async def media(bot, message):
+    """Handles new media messages"""
+    media = next((getattr(message, attr) for attr in ("document", "video", "audio") if getattr(message, attr, None)), None)
+    if not media:
+        return
 
-def build_reaction_buttons(movie_id: str, search_query: str) -> InlineKeyboardMarkup:
-    buttons = [
-        [
-            InlineKeyboardButton(f"❤️ {reaction_counts[movie_id]['❤️']}", callback_data=f"h:{movie_id}"),
-            InlineKeyboardButton(f"👍 {reaction_counts[movie_id]['👍']}", callback_data=f"l:{movie_id}"),
-            InlineKeyboardButton(f"👎 {reaction_counts[movie_id]['👎']}", callback_data=f"d:{movie_id}"),
-            InlineKeyboardButton(f"🔥 {reaction_counts[movie_id]['🔥']}", callback_data=f"f:{movie_id}")
-        ],
-        [
-            InlineKeyboardButton('📂 Get File 📂', url=f'https://telegram.me/{temp.U_NAME}?start=getfile-{search_query}')
-        ],
-        [
-            InlineKeyboardButton('♻️ How To Download ♻️', url=HOW_TO_DOWNLOAD_URL)
-        ]
-    ]
-    return InlineKeyboardMarkup(buttons)
+    media.file_type = media.mime_type
+    media.caption = message.caption
 
-async def extract_metadata(text: str) -> Tuple[Set[str], Set[str], Set[str], Set[str]]:
-    text_lower = text.lower()
-    formats, qualities, languages, ott = set(), set(), set(), set()
-
-    format_keywords = {"ORG", "HDRip", "WEB-DL", "WEBRip", "HDCAM", "HQ",
-                       "CAMRip", "HDTC", "DVDscr", "dvdrip", "dvdscreen", "HDTS"}
-    for fmt in format_keywords:
-        if re.search(rf"\b{re.escape(fmt.lower())}\b", text_lower):
-            formats.add(fmt)
-
-    quality_keywords = {"480p", "720p", "1080p", "2160p", "4k", "2k"}
-    for qual in quality_keywords:
-        if re.search(rf"\b{re.escape(qual)}\b", text_lower):
-            qualities.add(qual)
-
-    for lang in CAPTION_LANGUAGES:
-        if re.search(rf"\b{re.escape(lang.lower())}\b", text_lower):
-            languages.add(lang)
-
-    ott_keywords = {
-        "Netflix": ["nf", "netflix"],
-        "SonyLiv": ["sonyliv", "sony", "sliv"],
-        "Amazon Prime Video": ["amzn", "prime", "primevideo"],
-        "Disney+ Hotstar": ["hotstar"],
-        "Zee5": ["zee5"],
-        "JioHotstar": ["jio", "jhs"],
-        "Aha": ["aha"],
-        "HBO Max": ["hbo"],
-        "Paramount+": ["paramount"],
-        "Apple TV+": ["apple"],
-        "Hoichoi": ["hoichoi"],
-        "Sun NXT": ["sunnxt"],
-        "Viki": ["viki"],
-        "ChaupalTV": ["chtv", "chpl", "chaupal"],
-        "KABLEONE": ["kableone"]
-    }
-    for platform, keys in ott_keywords.items():
-        if any(re.search(rf"\b{re.escape(k)}\b", text_lower) for k in keys):
-            ott.add(platform)
-
-    return formats, qualities, languages, ott
-
-# ========== MOVIE UPDATE HANDLER ========== #
-@Client.on_message(filters.chat(CHANNELS) & (filters.document | filters.video | filters.audio))
-async def media_handler(bot: Client, message):
+    success, silentxbotz = await save_file(bot, media)
     try:
-        media = message.document or message.video or message.audio
-        if not media:
-            return
-
-        media.file_type = "document" if message.document else "video" if message.video else "audio"
-        media.caption = message.caption or ""
-        media.file_name = getattr(media, "file_name", "") or ""
-
-        success, _ = await save_file(media)
-        if not success or not await get_status(bot.me.id):
-            return
-
-        await process_movie_update(bot, media.file_name, media.caption)
+        if success and silentxbotz == 1:
+            await send_movie_update(bot, file_name=media.file_name, caption=media.caption)
     except Exception as e:
-        print(f"❌ Media handler error: {e}")
+        print(f"Error in media handler: {e}")
 
-async def process_movie_update(bot: Client, file_name: str, caption: str):
+
+async def send_movie_update(bot, file_name, caption):
     try:
-        clean_name = clean_movie_title(file_name)
-        clean_name, year = extract_year(clean_name)
-        if not clean_name or len(clean_name) < 3:
-            clean_name = clean_movie_title(caption)
-            clean_name, year = extract_year(clean_name)
+        clean_name = await movie_name_format(file_name)
+        year_match = re.search(r"\b(19|20)\d{2}\b", caption)
+        year = year_match.group(0) if year_match else None
+        search_query = clean_name.replace(" ", "-")
 
-        if not clean_name or len(clean_name) < 3:
-            print(f"⚠️ Invalid title: {file_name}")
-            return
+        # ✅ Create movie_id (hash)
+        movie_id = hashlib.md5(clean_name.encode()).hexdigest()[:8]
 
-        movie_id = generate_movie_id(clean_name)
-        search_query = hashlib.md5(clean_name.encode()).hexdigest()[:12]
-        formats, qualities, languages, ott = await extract_metadata(f"{clean_name} {caption}")
+        # ✅ Extract quality, format, language, ott
+        quality = await get_pixels(caption) or "Unknown"
+        fmt = await get_qualities(caption) or "ORG"
+        language = ", ".join([lang for lang in CAPTION_LANGUAGES if lang.lower() in caption.lower()]) or "Unknown"
+        ott_match = re.search(r"(Netflix|Amazon Prime|Disney\+ Hotstar|SonyLiv|ZEE5|JioCinema|Apple TV\+)", caption, re.I)
+        ott = ott_match.group(0) if ott_match else None
 
+        # ✅ Initialize if movie not exists
         if movie_id not in movie_data:
+            imdb_data = await get_imdb_details(clean_name)
+            poster = await fetch_movie_poster(imdb_data.get("title", clean_name), year)
+            genres = ", ".join(imdb_data.get("genres", [])) or "N/A"
+            rating = imdb_data.get("rating", "N/A")
+
             movie_data[movie_id] = {
-                'title': clean_name,
-                'year': year,
+                'title': imdb_data.get("title", clean_name),
+                'year': year or "N/A",
                 'formats': set(),
                 'qualities': set(),
                 'languages': set(),
                 'ott': set(),
                 'message_id': None,
-                'search_query': search_query
+                'poster': poster,
+                'genres': genres,
+                'rating': rating
             }
             reaction_counts[movie_id] = {"❤️": 0, "👍": 0, "👎": 0, "🔥": 0}
             user_reactions[movie_id] = {}
 
-        movie_data[movie_id]['formats'].update(formats)
-        movie_data[movie_id]['qualities'].update(qualities)
-        movie_data[movie_id]['languages'].update(languages)
-        movie_data[movie_id]['ott'].update(ott)
+        # ✅ Add details to sets
+        movie_data[movie_id]['formats'].add(fmt)
+        movie_data[movie_id]['qualities'].add(quality)
+        movie_data[movie_id]['languages'].add(language)
+        if ott:
+            movie_data[movie_id]['ott'].add(ott)
 
-        imdb_data = {}
-        try:
-            imdb_data = await get_poster(clean_name) or {}
-        except Exception as e:
-            print(f"❌ IMDb fetch error: {e}")
+        # ✅ Prepare caption
+        full_caption = UPDATE_CAPTION.format(
+            TITLE=movie_data[movie_id]['title'],
+            YEAR=movie_data[movie_id]['year'],
+            FORMATS=", ".join(sorted(movie_data[movie_id]['formats'])),
+            QUALITIES=", ".join(sorted(movie_data[movie_id]['qualities'])),
+            LANGUAGES=", ".join(sorted(movie_data[movie_id]['languages'])),
+            GENRES=movie_data[movie_id]['genres'],
+            RATING=movie_data[movie_id]['rating'],
+            OTT=", ".join(sorted(movie_data[movie_id]['ott'])) if movie_data[movie_id]['ott'] else "N/A",
+            PROVIDER=PROVIDER_NAME
+        )
 
-        display_title = clean_name
-        if year:
-            display_title = f"{clean_name} ({year})"
-        elif imdb_data.get("year"):
-            display_title = f"{clean_name} ({imdb_data['year']})"
+        # ✅ Buttons
+        buttons = [[
+            InlineKeyboardButton(f"❤️ {reaction_counts[movie_id]['❤️']}", callback_data=f"r_{movie_id}_{search_query}_heart"),
+            InlineKeyboardButton(f"👍 {reaction_counts[movie_id]['👍']}", callback_data=f"r_{movie_id}_{search_query}_like"),
+            InlineKeyboardButton(f"👎 {reaction_counts[movie_id]['👎']}", callback_data=f"r_{movie_id}_{search_query}_dislike"),
+            InlineKeyboardButton(f"🔥 {reaction_counts[movie_id]['🔥']}", callback_data=f"r_{movie_id}_{search_query}_fire")
+        ], [
+            InlineKeyboardButton('📂 Get File 📂', url=f'https://telegram.me/{U_NAME}?start=getfile-{search_query}')
+        ], [
+            InlineKeyboardButton('♻️ How To Download ♻️', url=f'https://t.me/+dVRLYHXJztJlMmY9')
+        ]]
 
-        caption_lines = [f"<b>【{display_title}】🆕️</b>"]
-
-        ott_str = ", ".join(sorted(movie_data[movie_id]['ott']))
-        if ott_str:
-            caption_lines.append(f"<b>📀 OTT - {ott_str}</b>")
-
-        rating = imdb_data.get("rating")
-        if rating:
-            rating = rating if '★' in rating else f"{rating}★"
-            caption_lines.append(f"<b>⭐️ Rating - {rating}</b>")
-
-        format_str = ", ".join(sorted(movie_data[movie_id]['formats']))
-        if format_str:
-            caption_lines.append(f"<b>📺 Format - {format_str}</b>")
-
-        quality_str = ", ".join(sorted(movie_data[movie_id]['qualities'], key=quality_sort_key))
-        if quality_str:
-            caption_lines.append(f"<b>🔰 Quality - {quality_str}</b>")
-
-        language_str = ", ".join(sorted(movie_data[movie_id]['languages']))
-        if language_str:
-            caption_lines.append(f"<b>🔈 Audio - {language_str}</b>")
-
-        genres = imdb_data.get("genres")
-        if genres:
-            caption_lines.append(f"<b>🎭 Genres - {genres}</b>")
-
-        caption_lines.append("")
-        caption_lines.append(f"<blockquote>👑 Provided By : {PROVIDER_NAME}</blockquote>")
-        full_caption = "\n".join(caption_lines)
-
-        buttons = build_reaction_buttons(movie_id, search_query)
-        poster_title = imdb_data.get("title", clean_name)
-        poster_year = imdb_data.get("year", year)
-        poster = await fetch_movie_poster(poster_title, poster_year)
-
+        # ✅ If old message exists → edit
         if movie_data[movie_id]['message_id']:
             try:
                 await bot.edit_message_caption(
                     chat_id=MOVIE_UPDATE_CHANNEL,
                     message_id=movie_data[movie_id]['message_id'],
                     caption=full_caption,
-                    reply_markup=buttons
+                    reply_markup=InlineKeyboardMarkup(buttons)
                 )
-                print(f"✅ Updated: {display_title}")
+                print(f"✅ Updated: {movie_data[movie_id]['title']}")
                 return
             except MessageNotModified:
                 return
@@ -268,63 +145,102 @@ async def process_movie_update(bot: Client, file_name: str, caption: str):
                 print(f"⚠️ Edit failed: {e}")
                 movie_data[movie_id]['message_id'] = None
 
+        # ✅ Else send new message
         sent = await bot.send_photo(
             chat_id=MOVIE_UPDATE_CHANNEL,
-            photo=poster or DEFAULT_POSTER_URL,
+            photo=movie_data[movie_id]['poster'] or "https://te.legra.ph/file/88d845b4f8a024a71465d.jpg",
             caption=full_caption,
-            reply_markup=buttons
+            reply_markup=InlineKeyboardMarkup(buttons)
         )
         movie_data[movie_id]['message_id'] = sent.message_id
-        print(f"📤 New movie: {display_title}")
+        print(f"📤 New movie: {movie_data[movie_id]['title']}")
 
     except Exception as e:
-        print(f"❌ Process error: {e}")
+        print(f"Error in send_movie_update: {e}")
 
-@Client.on_callback_query(filters.regex(r"^(h|l|d|f):"))
+
+# ✅ Reaction Handler
+@Client.on_callback_query(filters.regex(r"^r_"))
 async def reaction_handler(client, query):
     try:
-        reaction_code, movie_id = query.data.split(":", 1)
-        if movie_id not in reaction_counts:
-            await query.answer("⚠️ Movie not found!", show_alert=True)
-            return
-
-        emoji_map = {"h": "❤️", "l": "👍", "d": "👎", "f": "🔥"}
-        new_emoji = emoji_map.get(reaction_code)
-        if not new_emoji:
-            return
-
+        _, movie_id, search_query, reaction_key = query.data.split("_")
         user_id = query.from_user.id
-        current_reaction = user_reactions[movie_id].get(user_id)
 
-        if current_reaction:
-            reaction_counts[movie_id][current_reaction] -= 1
+        emoji_map = {"heart": "❤️", "like": "👍", "dislike": "👎", "fire": "🔥"}
+        if reaction_key not in emoji_map or movie_id not in reaction_counts:
+            return
 
-        reaction_counts[movie_id][new_emoji] += 1
+        new_emoji = emoji_map[reaction_key]
+
+        if user_id in user_reactions[movie_id]:
+            old_emoji = user_reactions[movie_id][user_id]
+            if old_emoji == new_emoji:
+                return
+            else:
+                reaction_counts[movie_id][old_emoji] -= 1
+
         user_reactions[movie_id][user_id] = new_emoji
+        reaction_counts[movie_id][new_emoji] += 1
 
-        await query.message.edit_reply_markup(
-            reply_markup=build_reaction_buttons(
-                movie_id,
-                movie_data[movie_id]["search_query"]
-            )
-        )
-        await query.answer(f"✅ {new_emoji} reaction updated!")
+        updated_buttons = [[
+            InlineKeyboardButton(f"❤️ {reaction_counts[movie_id]['❤️']}", callback_data=f"r_{movie_id}_{search_query}_heart"),
+            InlineKeyboardButton(f"👍 {reaction_counts[movie_id]['👍']}", callback_data=f"r_{movie_id}_{search_query}_like"),
+            InlineKeyboardButton(f"👎 {reaction_counts[movie_id]['👎']}", callback_data=f"r_{movie_id}_{search_query}_dislike"),
+            InlineKeyboardButton(f"🔥 {reaction_counts[movie_id]['🔥']}", callback_data=f"r_{movie_id}_{search_query}_fire")
+        ], [
+            InlineKeyboardButton('📂 Get File 📂', url=f'https://telegram.me/{U_NAME}?start=getfile-{search_query}')
+        ], [
+            InlineKeyboardButton('♻️ How To Download ♻️', url=f'https://t.me/+dVRLYHXJztJlMmY9')
+        ]]
+
+        await query.message.edit_reply_markup(reply_markup=InlineKeyboardMarkup(updated_buttons))
+
     except Exception as e:
-        print(f"❌ Reaction error: {e}")
-        await query.answer("⚠️ Error! Please try later", show_alert=True)
+        print("Reaction error:", e)
 
-async def fetch_movie_poster(title: str, year: Optional[str] = None) -> Optional[bytes]:
-    if not title:
-        return None
+
+# ✅ IMDb & Poster Functions
+async def get_imdb_details(name):
     try:
-        params = {"title": title.strip()}
-        if year:
-            params["year"] = str(year)
+        formatted_name = await movie_name_format(name)
+        imdb = await get_poster(formatted_name)
+        return imdb or {}
+    except Exception as e:
+        print(f"IMDB fetch error: {e}")
+        return {}
+
+
+async def fetch_movie_poster(title: str, year: Optional[int] = None) -> Optional[str]:
+    base_url = "https://image.silentxbotz.tech/api/v1/poster"
+    params = {"title": title.strip()}
+    if year:
+        params["year"] = str(year)
+    try:
         async with aiohttp.ClientSession() as session:
-            async with session.get(POSTER_API_URL, params=params, timeout=15) as response:
+            async with session.get(base_url, params=params, timeout=aiohttp.ClientTimeout(total=20)) as response:
                 if response.status == 200:
                     return await response.read()
-                print(f"⚠️ Poster API error: HTTP {response.status}")
     except Exception as e:
-        print(f"🌐 Network error: {type(e).__name__}")
+        print(f"Poster fetch error: {e}")
     return None
+
+
+# ✅ Helper Functions
+async def get_qualities(text):
+    qualities = ["HDCAM", "HDRip", "BluRay", "WEB-DL", "WEBRip", "HDTC", "DVDscr", "DVDRip", "HDTS", "ORG", "HQ"]
+    for q in qualities:
+        if q.lower() in text.lower():
+            return q
+    return "ORG"
+
+
+async def get_pixels(text):
+    return next((p for p in ["480p", "720p", "1080p", "2160p", "4K"] if p.lower() in text.lower()), "Unknown")
+
+
+async def movie_name_format(file_name):
+    return re.sub(r'http\S+|@\w+|#\w+|[\[\]\(\)\{\}\.\-_:;\'!]', ' ', file_name).strip()
+
+
+def generate_unique_id(name):
+    return hashlib.md5(name.encode()).hexdigest()[:5]
