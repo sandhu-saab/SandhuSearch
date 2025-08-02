@@ -216,7 +216,6 @@ async def process_movie_update(bot: Client, file_name: str, caption: str):
                     message_id=msg_id,
                     caption=full_caption,
                     reply_markup=InlineKeyboardMarkup(buttons)
-                )
                 print(f"✅ अपडेट हुआ: {clean_name}")
                 return
             except Exception:
@@ -233,13 +232,12 @@ async def process_movie_update(bot: Client, file_name: str, caption: str):
                     photo=photo_file,
                     caption=full_caption,
                     reply_markup=InlineKeyboardMarkup(buttons)
-                )
             else:
                 sent = await bot.send_photo(
                     chat_id=MOVIE_UPDATE_CHANNEL,
                     photo=DEFAULT_POSTER_URL,
                     caption=full_caption,
-                    reply_markup=InlineKeyboardMarkup(buttons)
+                    reply_markup=InlineKeyboardMarkup(buttons))
             
             movie_data[movie_id]['message_id'] = sent.id
             print(f"📤 नया मूवी: {clean_name}")
