@@ -19,10 +19,10 @@ CAPTION_LANGUAGES = ["Bhojpuri", "Hindi", "Bengali", "Tamil", "English", "Bangla
 
 NEW_UPLOAD_CAPTION = """<b>​​​​【{NAME}】🆕️
 
-📻 Fᵐᴍʀᴀᴛ: {QUALITY}
-🔰 Qᵔᴀʟɪᴛᵀ: {PIXEL}
-🔊 Aᵔᴀᴀᴉᴏ: {LANGUAGES}
-🎭 Gᴇᴟʀᴇˣ: {GENRE}
+📺 Fᴏʀᴍᴀᴛ: {QUALITY}
+🔰 Qᴜᴀʟɪᴛʏ: 720p, 1080p, etc.
+🔈 Aᴜᴅɪᴏ: {LANGUAGES}
+🎭 Gᴇɴʀᴇꜱ: {GENRE}
 ⭐️ IMDb: {RATING}★
 
 <blockquote>👑 Pʀᴏᴡɪᴅᴇᴅ Bʏ : @OttSandhu</blockquote></b>
