@@ -102,9 +102,9 @@ async def extract_ott(text: str) -> Set[str]:
 async def media_handler(bot: Client, message):
     """Handle new media updates from channels"""
     media = next(
-    (getattr(message, attr) for attr in ("document", "video", "audio") if getattr(message, attr, None)),
-    None
-)
+        (getattr(message, attr) for attr in ("document", "video", "audio") if getattr(message, attr, None)),
+        None
+    )
     
     if not media:
         return
