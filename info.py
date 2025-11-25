@@ -61,7 +61,7 @@ AUTH_CHANNEL = [int(ch) for ch in AUTH_CHANNEL.strip().split()] if AUTH_CHANNEL 
 AUTH_REQ_CHANNEL = environ.get('AUTH_REQ_CHANNEL', '-1002116325676') # add multiple channels here, separated by single space
 AUTH_REQ_CHANNEL = [int(ch) for ch in AUTH_REQ_CHANNEL.strip().split()] if AUTH_REQ_CHANNEL else []
 
-IS_VERIFY = is_enabled('IS_VERIFY', True)
+IS_VERIFY = is_enabled('IS_VERIFY', False)
 LOG_VR_CHANNEL = int(environ.get('LOG_VR_CHANNEL', '-1002122152204'))
 LOG_API_CHANNEL = int(environ.get('LOG_API_CHANNEL', '-1002122152204'))
 VERIFY_IMG = environ.get("VERIFY_IMG", "https://i.ibb.co/CpW8PSzj/photo-2025-08-02-03-11-10-7533820490603823108.jpg")
