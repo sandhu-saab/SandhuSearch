@@ -22,20 +22,20 @@ CAPTION_LANGUAGES = ["Bhojpuri", "Hindi", "Bengali", "Tamil", "English", "Bangla
 
 DEFAULT_IMAGE_URL = "https://te.legra.ph/file/88d845b4f8a024a71465d.jpg"
 
-SILENTX_PREMIUM_UPDATE = """<b><u>{}</u></b> 🆕️ <code>#{}</code>
+SILENTX_PREMIUM_UPDATE = """<b>​【{}】🆕️ <code>#{}</code>
 
 <code>━━━━━━━━━━━━━━━━━━</code>
-<b>🔈 Audio</b>: {}
-<b>📺 Format</b>: {}
+🔈 Audio: {}
+📺 Format: {}
 
 <code>━━━━━━━━━━━━━━━━━━</code>
-<b>🎭 Director</b>: {}
-<b>📅 Release</b>: {}
-<b>⭐ IMDb</b>: {}/10 (<code>{}</code> votes)
-<b>🏷️ Genres</b>: {}
+🎭 Director: {}
+📅 Release: {}
+⭐ IMDb: {}/10 (<code>{}</code> votes)
+🏷️ Genres: {}
 <code>━━━━━━━━━━━━━━━━━━</code>
 
-<b>⚡ Powered By @OttSandhu</b>
+⚡ Powered By @OttSandhu</b>
 """
 
 notified_movies = set()
