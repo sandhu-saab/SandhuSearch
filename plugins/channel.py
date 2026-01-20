@@ -27,6 +27,7 @@ SILENTX_PREMIUM_UPDATE = """<b>​【{}】🆕️ <code>#{}</code>
 <code>━━━━━━━━━━━━━━━━━━</code>
 🔈 Audio: {}
 📺 Format: {}
+🔰 Quality: 720p, 1080p, etc.
 
 <code>━━━━━━━━━━━━━━━━━━</code>
 🎭 Director: {}
