@@ -119,7 +119,7 @@ async def send_with_visual(bot, caption: str, tmdb_data: Dict, search_movie):
         visual_url = await get_best_visual(tmdb_data)
         get_file = f'https://telegram.me/{temp.U_NAME}?start=getfile-{search_movie}'
         keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("📱 Get File", url=get_file)],
+            [InlineKeyboardButton("🔎Tap to Search", url=get_file)],
             get_trailer_button(tmdb_data)
         ])
         
