@@ -22,7 +22,7 @@ CAPTION_LANGUAGES = ["Bhojpuri", "Hindi", "Bengali", "Tamil", "English", "Bangla
 
 DEFAULT_IMAGE_URL = "https://te.legra.ph/file/88d845b4f8a024a71465d.jpg"
 
-SILENTX_PREMIUM_UPDATE = """<b>{} 🆕️ <code>#{}</code>
+SILENTX_PREMIUM_UPDATE = """<b>​【{}】🆕️ <code>#{}</code>
 
 <code>━━━━━━━━━━━━━━━━━━</code>
 <b>🔈 Audio</b>: {}
